@@ -27,14 +27,9 @@ export default function Products() {
 
   const handleAddToSubscription = async (productId: string) => {
     if (!subscription) {
-      await createSubscription.mutateAsync('weekly');
-      const { data } = await import('@/integrations/supabase/client').then(m => m.supabase)
-        .from('subscriptions')
-        .select('id')
-        .eq('user_id', user?.id)
-        .single();
-      if (data) {
-        addToSubscription.mutate({ subscriptionId: data.id, productId });
+      const newSub = await createSubscription.mutateAsync('weekly');
+      if (newSub) {
+        addToSubscription.mutate({ subscriptionId: newSub.id, productId });
       }
     } else {
       addToSubscription.mutate({ subscriptionId: subscription.id, productId });
