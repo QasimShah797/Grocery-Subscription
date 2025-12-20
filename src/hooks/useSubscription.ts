@@ -1,0 +1,255 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth-context';
+import { toast } from 'sonner';
+import { Database } from '@/integrations/supabase/types';
+
+type SubscriptionType = Database['public']['Enums']['subscription_type'];
+type SubscriptionStatus = Database['public']['Enums']['subscription_status'];
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  type: SubscriptionType;
+  status: SubscriptionStatus;
+  total_pkr: number | null;
+  next_renewal_date: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriptionItem {
+  id: string;
+  subscription_id: string;
+  product_id: string;
+  quantity: number;
+  created_at: string;
+  product?: {
+    id: string;
+    name: string;
+    price_pkr: number;
+    image_url: string | null;
+    category: string;
+  };
+}
+
+export function useSubscription() {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['subscription', user?.id],
+    queryFn: async () => {
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data as Subscription | null;
+    },
+    enabled: !!user,
+  });
+}
+
+export function useSubscriptionItems(subscriptionId: string | undefined) {
+  return useQuery({
+    queryKey: ['subscription-items', subscriptionId],
+    queryFn: async () => {
+      if (!subscriptionId) return [];
+      
+      const { data, error } = await supabase
+        .from('subscription_items')
+        .select(`
+          *,
+          product:products(id, name, price_pkr, image_url, category)
+        `)
+        .eq('subscription_id', subscriptionId);
+      
+      if (error) throw error;
+      return data as SubscriptionItem[];
+    },
+    enabled: !!subscriptionId,
+  });
+}
+
+export function useCreateSubscription() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useMutation({
+    mutationFn: async (type: SubscriptionType) => {
+      if (!user) throw new Error('Must be logged in');
+      
+      const nextRenewal = new Date();
+      if (type === 'weekly') {
+        nextRenewal.setDate(nextRenewal.getDate() + 7);
+      } else {
+        nextRenewal.setMonth(nextRenewal.getMonth() + 1);
+      }
+      
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .insert({
+          user_id: user.id,
+          type,
+          status: 'active',
+          total_pkr: 0,
+          next_renewal_date: nextRenewal.toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      toast.success('Subscription created!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useAddToSubscription() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ subscriptionId, productId, quantity = 1 }: { subscriptionId: string; productId: string; quantity?: number }) => {
+      // Check if item already exists
+      const { data: existing } = await supabase
+        .from('subscription_items')
+        .select('id, quantity')
+        .eq('subscription_id', subscriptionId)
+        .eq('product_id', productId)
+        .single();
+      
+      if (existing) {
+        // Update quantity
+        const { error } = await supabase
+          .from('subscription_items')
+          .update({ quantity: existing.quantity + quantity })
+          .eq('id', existing.id);
+        
+        if (error) throw error;
+      } else {
+        // Insert new item
+        const { error } = await supabase
+          .from('subscription_items')
+          .insert({
+            subscription_id: subscriptionId,
+            product_id: productId,
+            quantity,
+          });
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription-items'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      toast.success('Added to subscription!');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useUpdateSubscriptionItem() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      if (quantity < 1) {
+        // Delete if quantity is 0
+        const { error } = await supabase
+          .from('subscription_items')
+          .delete()
+          .eq('id', id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('subscription_items')
+          .update({ quantity })
+          .eq('id', id);
+        
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription-items'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useRemoveFromSubscription() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from('subscription_items')
+        .delete()
+        .eq('id', itemId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription-items'] });
+      toast.success('Removed from subscription');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useUpdateSubscription() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Subscription> & { id: string }) => {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      toast.success('Subscription updated');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useAllSubscriptions() {
+  return useQuery({
+    queryKey: ['subscriptions', 'all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select(`
+          *,
+          profile:profiles(full_name, email)
+        `)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+}
