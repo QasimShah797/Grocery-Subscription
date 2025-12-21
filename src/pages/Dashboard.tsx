@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -6,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/auth-context';
 import { useSubscription, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription } from '@/hooks/useSubscription';
-import { Minus, Plus, Trash2, Calendar, Pause, Play } from 'lucide-react';
+import { CheckoutDialog } from '@/components/checkout/CheckoutDialog';
+import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard } from 'lucide-react';
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -15,6 +17,7 @@ export default function Dashboard() {
   const updateItem = useUpdateSubscriptionItem();
   const removeItem = useRemoveFromSubscription();
   const updateSubscription = useUpdateSubscription();
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
@@ -96,10 +99,22 @@ export default function Dashboard() {
                     <span>Total</span>
                     <span className="text-primary">{formatPrice(total)}</span>
                   </div>
+                  <Button className="w-full" onClick={() => setCheckoutOpen(true)} disabled={!items || items.length === 0}>
+                    <CreditCard className="w-4 h-4 mr-2" /> Checkout
+                  </Button>
                   <Button variant="outline" className="w-full" onClick={toggleStatus}>
                     {subscription.status === 'active' ? <><Pause className="w-4 h-4 mr-2" /> Pause</> : <><Play className="w-4 h-4 mr-2" /> Resume</>}
                   </Button>
                 </CardContent>
+                
+                {subscription && (
+                  <CheckoutDialog
+                    open={checkoutOpen}
+                    onOpenChange={setCheckoutOpen}
+                    subscriptionId={subscription.id}
+                    amount={total}
+                  />
+                )}
               </Card>
             </div>
           ) : (

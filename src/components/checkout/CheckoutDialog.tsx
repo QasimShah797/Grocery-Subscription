@@ -1,0 +1,241 @@
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Card, CardContent } from '@/components/ui/card';
+import { useCreateOrder } from '@/hooks/useOrders';
+import { useToast } from '@/hooks/use-toast';
+import { Smartphone, Building2, CreditCard, Loader2 } from 'lucide-react';
+
+interface CheckoutDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  subscriptionId: string;
+  amount: number;
+}
+
+const paymentMethods = [
+  {
+    id: 'easypaisa',
+    name: 'EasyPaisa',
+    icon: Smartphone,
+    color: 'bg-green-500',
+    description: 'Pay via EasyPaisa mobile wallet',
+    accountNumber: '0345-1234567',
+    accountTitle: 'Fresh Grocery PKR',
+  },
+  {
+    id: 'jazzcash',
+    name: 'JazzCash',
+    icon: Smartphone,
+    color: 'bg-red-500',
+    description: 'Pay via JazzCash mobile wallet',
+    accountNumber: '0300-9876543',
+    accountTitle: 'Fresh Grocery PKR',
+  },
+  {
+    id: 'bank_transfer',
+    name: 'Bank Transfer',
+    icon: Building2,
+    description: 'Direct bank transfer',
+    bankName: 'HBL - Habib Bank Limited',
+    accountNumber: 'PK36HABB0012345678901234',
+    accountTitle: 'Fresh Grocery PKR',
+  },
+] as const;
+
+export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: CheckoutDialogProps) {
+  const [paymentMethod, setPaymentMethod] = useState<'easypaisa' | 'jazzcash' | 'bank_transfer'>('easypaisa');
+  const [senderAccount, setSenderAccount] = useState('');
+  const [senderName, setSenderName] = useState('');
+  const [step, setStep] = useState<'select' | 'details' | 'confirm'>('select');
+  const createOrder = useCreateOrder();
+  const { toast } = useToast();
+
+  const selectedMethod = paymentMethods.find(m => m.id === paymentMethod)!;
+
+  const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
+    style: 'currency', 
+    currency: 'PKR', 
+    minimumFractionDigits: 0 
+  }).format(price);
+
+  const handleSubmit = async () => {
+    try {
+      await createOrder.mutateAsync({
+        subscription_id: subscriptionId,
+        amount_pkr: amount,
+        payment_method: paymentMethod,
+        payment_details: {
+          sender_account: senderAccount,
+          sender_name: senderName,
+        },
+      });
+      
+      toast({
+        title: 'Order Placed Successfully!',
+        description: 'Please complete your payment. We will verify and confirm your order.',
+      });
+      
+      onOpenChange(false);
+      setStep('select');
+      setSenderAccount('');
+      setSenderName('');
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to place order. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-display">
+            {step === 'select' && 'Select Payment Method'}
+            {step === 'details' && 'Payment Details'}
+            {step === 'confirm' && 'Confirm Payment'}
+          </DialogTitle>
+        </DialogHeader>
+
+        {step === 'select' && (
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-muted rounded-lg">
+              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-3xl font-bold text-primary">{formatPrice(amount)}</p>
+            </div>
+
+            <RadioGroup value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as typeof paymentMethod)}>
+              {paymentMethods.map((method) => (
+                <Card 
+                  key={method.id} 
+                  className={`cursor-pointer transition-all ${paymentMethod === method.id ? 'ring-2 ring-primary' : ''}`}
+                  onClick={() => setPaymentMethod(method.id)}
+                >
+                  <CardContent className="flex items-center gap-4 p-4">
+                    <RadioGroupItem value={method.id} id={method.id} />
+                    <div className={`w-10 h-10 rounded-full ${'color' in method ? method.color : 'bg-primary'} flex items-center justify-center`}>
+                      <method.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor={method.id} className="font-semibold cursor-pointer">{method.name}</Label>
+                      <p className="text-sm text-muted-foreground">{method.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </RadioGroup>
+
+            <Button className="w-full" onClick={() => setStep('details')}>
+              Continue
+            </Button>
+          </div>
+        )}
+
+        {step === 'details' && (
+          <div className="space-y-4">
+            <Card className="bg-muted/50">
+              <CardContent className="p-4 space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <selectedMethod.icon className="w-5 h-5" />
+                  {selectedMethod.name} Payment Details
+                </h3>
+                <div className="text-sm space-y-1">
+                  {selectedMethod.id === 'bank_transfer' && (
+                    <p><span className="text-muted-foreground">Bank:</span> {selectedMethod.bankName}</p>
+                  )}
+                  <p><span className="text-muted-foreground">Account Number:</span> <span className="font-mono">{selectedMethod.accountNumber}</span></p>
+                  <p><span className="text-muted-foreground">Account Title:</span> {selectedMethod.accountTitle}</p>
+                  <p className="font-semibold text-primary">Amount: {formatPrice(amount)}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <Label htmlFor="senderName">Your Name (as on account)</Label>
+                <Input 
+                  id="senderName" 
+                  value={senderName} 
+                  onChange={(e) => setSenderName(e.target.value)}
+                  placeholder="Enter your name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="senderAccount">
+                  Your {paymentMethod === 'bank_transfer' ? 'Account/IBAN' : 'Mobile'} Number
+                </Label>
+                <Input 
+                  id="senderAccount" 
+                  value={senderAccount} 
+                  onChange={(e) => setSenderAccount(e.target.value)}
+                  placeholder={paymentMethod === 'bank_transfer' ? 'Enter your IBAN' : 'e.g., 03XX-XXXXXXX'}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep('select')}>
+                Back
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={() => setStep('confirm')}
+                disabled={!senderName || !senderAccount}
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {step === 'confirm' && (
+          <div className="space-y-4">
+            <Card className="bg-accent/20">
+              <CardContent className="p-4 space-y-3">
+                <h3 className="font-semibold">Order Summary</h3>
+                <div className="text-sm space-y-1">
+                  <p><span className="text-muted-foreground">Payment Method:</span> {selectedMethod.name}</p>
+                  <p><span className="text-muted-foreground">Amount:</span> {formatPrice(amount)}</p>
+                  <p><span className="text-muted-foreground">Sender Name:</span> {senderName}</p>
+                  <p><span className="text-muted-foreground">Sender Account:</span> {senderAccount}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg text-sm">
+              <p className="font-semibold text-yellow-800 dark:text-yellow-200">Important:</p>
+              <ul className="list-disc list-inside text-yellow-700 dark:text-yellow-300 space-y-1 mt-1">
+                <li>Please transfer the exact amount to the account shown above</li>
+                <li>Your order will be confirmed after payment verification</li>
+                <li>Verification usually takes 1-2 hours during business hours</li>
+              </ul>
+            </div>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep('details')}>
+                Back
+              </Button>
+              <Button 
+                className="flex-1" 
+                onClick={handleSubmit}
+                disabled={createOrder.isPending}
+              >
+                {createOrder.isPending ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
+                ) : (
+                  <>Confirm Order</>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

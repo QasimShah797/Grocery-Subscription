@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
-import { ShoppingBag, User, LogOut, Menu, X, Leaf } from 'lucide-react';
+import { ShoppingBag, User, LogOut, Menu, X, Leaf, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
@@ -44,14 +44,20 @@ export function Header() {
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <>
-                {user && (
-                  <Link to="/dashboard">
+                {isAdmin && (
+                  <Link to="/admin">
                     <Button variant="outline" size="sm">
-                      <ShoppingBag className="w-4 h-4" />
-                      Dashboard
+                      <Settings className="w-4 h-4" />
+                      Admin
                     </Button>
                   </Link>
                 )}
+                <Link to="/dashboard">
+                  <Button variant="outline" size="sm">
+                    <ShoppingBag className="w-4 h-4" />
+                    Dashboard
+                  </Button>
+                </Link>
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="w-4 h-4" />
                   Logout
@@ -100,6 +106,15 @@ export function Header() {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   My Subscription
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  to="/admin"
+                  className="px-4 py-2 rounded-lg hover:bg-muted transition-colors text-primary font-medium"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Admin Panel
                 </Link>
               )}
               <hr className="my-2 border-border" />

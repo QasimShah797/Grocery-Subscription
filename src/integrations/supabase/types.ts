@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      orders: {
+        Row: {
+          amount_pkr: number
+          created_at: string
+          id: string
+          payment_details: Json | null
+          payment_method: string
+          payment_status: string
+          subscription_id: string | null
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount_pkr: number
+          created_at?: string
+          id?: string
+          payment_details?: Json | null
+          payment_method: string
+          payment_status?: string
+          subscription_id?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount_pkr?: number
+          created_at?: string
+          id?: string
+          payment_details?: Json | null
+          payment_method?: string
+          payment_status?: string
+          subscription_id?: string | null
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category: string
