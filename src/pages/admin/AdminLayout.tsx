@@ -1,6 +1,6 @@
 import { Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Users, ShoppingCart, LayoutDashboard, ArrowLeft, Receipt } from 'lucide-react';
+import { Package, Users, ShoppingCart, LayoutDashboard, ArrowLeft, Receipt, Bike } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { href: '/admin/users', label: 'Users', icon: Users },
   { href: '/admin/subscriptions', label: 'Subscriptions', icon: ShoppingCart },
   { href: '/admin/orders', label: 'Orders', icon: Receipt },
+  { href: '/admin/riders', label: 'Riders', icon: Bike },
 ];
 
 export default function AdminLayout() {

@@ -5,17 +5,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
-import { Loader2, Eye } from 'lucide-react';
+import { useAvailableRiders } from '@/hooks/useRiders';
+import { useDeliveryAssignments, useCreateDeliveryAssignment, useAssignRider } from '@/hooks/useDeliveryAssignments';
+import { Loader2, Eye, Truck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
 export default function AdminOrders() {
   const { data: orders, isLoading } = useAllOrders();
+  const { data: riders } = useAvailableRiders();
+  const { data: deliveryAssignments } = useDeliveryAssignments();
   const updateOrderStatus = useUpdateOrderStatus();
+  const createDeliveryAssignment = useCreateDeliveryAssignment();
+  const assignRider = useAssignRider();
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [transactionId, setTransactionId] = useState('');
+  const [selectedRider, setSelectedRider] = useState('');
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
@@ -34,6 +42,40 @@ export default function AdminOrders() {
     }
   };
 
+  const handleAssignRider = async (orderId: string) => {
+    if (!selectedRider) {
+      toast({ title: 'Please select a rider', variant: 'destructive' });
+      return;
+    }
+    
+    try {
+      // Check if delivery assignment exists for this order
+      const existingAssignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
+      
+      if (existingAssignment) {
+        await assignRider.mutateAsync({ id: existingAssignment.id, rider_id: selectedRider });
+      } else {
+        await createDeliveryAssignment.mutateAsync({ order_id: orderId, rider_id: selectedRider });
+      }
+      
+      toast({ title: 'Rider assigned successfully' });
+      setSelectedRider('');
+      setSelectedOrder(null);
+    } catch {
+      toast({ title: 'Failed to assign rider', variant: 'destructive' });
+    }
+  };
+
+  const getDeliveryStatus = (orderId: string) => {
+    const assignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
+    return assignment?.status || null;
+  };
+
+  const getAssignedRider = (orderId: string) => {
+    const assignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
+    return assignment?.riders;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed': return 'success';
@@ -42,6 +84,16 @@ export default function AdminOrders() {
       case 'failed': return 'destructive';
       case 'cancelled': return 'secondary';
       default: return 'secondary';
+    }
+  };
+
+  const getDeliveryStatusColor = (status: string) => {
+    switch (status) {
+      case 'delivered': return 'bg-green-100 text-green-700';
+      case 'picked_up': return 'bg-blue-100 text-blue-700';
+      case 'assigned': return 'bg-yellow-100 text-yellow-700';
+      case 'pending': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
@@ -68,37 +120,52 @@ export default function AdminOrders() {
                 <TableRow>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Customer</TableHead>
-                  <TableHead>Payment Method</TableHead>
+                  <TableHead>Payment</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Delivery</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {orders?.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}...</TableCell>
-                    <TableCell className="font-medium">
-                      {(order as any).profiles?.full_name || (order as any).profiles?.email || 'Unknown'}
-                    </TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentMethodColor(order.payment_method)}`}>
-                        {order.payment_method.replace('_', ' ')}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-semibold">{formatPrice(order.amount_pkr)}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(order.payment_status) as any}>{order.payment_status}</Badge>
-                    </TableCell>
-                    <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
-                    <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => setSelectedOrder(order)}>
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {orders?.map((order) => {
+                  const deliveryStatus = getDeliveryStatus(order.id);
+                  const assignedRider = getAssignedRider(order.id);
+                  
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}...</TableCell>
+                      <TableCell className="font-medium">
+                        {(order as any).profiles?.full_name || (order as any).profiles?.email || 'Unknown'}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentMethodColor(order.payment_method)}`}>
+                          {order.payment_method.replace('_', ' ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-semibold">{formatPrice(order.amount_pkr)}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(order.payment_status) as any}>{order.payment_status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {deliveryStatus ? (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(deliveryStatus)}`}>
+                            {deliveryStatus}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Not assigned</span>
+                        )}
+                      </TableCell>
+                      <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <Button size="icon" variant="ghost" onClick={() => setSelectedOrder(order)}>
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -106,7 +173,7 @@ export default function AdminOrders() {
       </Card>
 
       <Dialog open={!!selectedOrder} onOpenChange={() => setSelectedOrder(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
           </DialogHeader>
@@ -115,7 +182,7 @@ export default function AdminOrders() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Order ID</p>
-                  <p className="font-mono">{selectedOrder.id}</p>
+                  <p className="font-mono text-xs">{selectedOrder.id}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Amount</p>
@@ -139,9 +206,60 @@ export default function AdminOrders() {
                 </div>
               )}
 
+              {/* Rider Assignment Section */}
+              <div className="p-4 border rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Delivery Assignment</h3>
+                </div>
+                
+                {getAssignedRider(selectedOrder.id) ? (
+                  <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Assigned to:</span>{' '}
+                      <span className="font-medium">{(getAssignedRider(selectedOrder.id) as any)?.profiles?.full_name || 'Rider'}</span>
+                    </p>
+                    <p className="text-sm">
+                      <span className="text-muted-foreground">Status:</span>{' '}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getDeliveryStatusColor(getDeliveryStatus(selectedOrder.id) || 'pending')}`}>
+                        {getDeliveryStatus(selectedOrder.id)}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Assign Rider</Label>
+                    <div className="flex gap-2">
+                      <Select value={selectedRider} onValueChange={setSelectedRider}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Select a rider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {riders?.map((rider: any) => (
+                            <SelectItem key={rider.id} value={rider.id}>
+                              {rider.profiles?.full_name || rider.phone} - {rider.vehicle_type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button 
+                        onClick={() => handleAssignRider(selectedOrder.id)}
+                        disabled={!selectedRider || assignRider.isPending || createDeliveryAssignment.isPending}
+                      >
+                        {(assignRider.isPending || createDeliveryAssignment.isPending) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Assign'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-3 pt-4 border-t">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Transaction ID (optional)</label>
+                  <Label>Transaction ID (optional)</Label>
                   <Input 
                     value={transactionId} 
                     onChange={(e) => setTransactionId(e.target.value)}
@@ -149,7 +267,7 @@ export default function AdminOrders() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Update Status</label>
+                  <Label>Update Payment Status</Label>
                   <div className="flex gap-2">
                     <Select onValueChange={(value) => handleStatusChange(selectedOrder.id, value)}>
                       <SelectTrigger className="flex-1">

@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCreateOrder } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
-import { Smartphone, Building2, CreditCard, Loader2 } from 'lucide-react';
+import { Smartphone, Building2, Loader2 } from 'lucide-react';
 
 interface CheckoutDialogProps {
   open: boolean;
@@ -15,6 +16,19 @@ interface CheckoutDialogProps {
   subscriptionId: string;
   amount: number;
 }
+
+const bankOptions = [
+  { id: 'hbl', name: 'HBL - Habib Bank Limited', iban: 'PK36HABB0012345678901234' },
+  { id: 'ubl', name: 'UBL - United Bank Limited', iban: 'PK36UBBL0012345678901234' },
+  { id: 'mcb', name: 'MCB - Muslim Commercial Bank', iban: 'PK36MCBL0012345678901234' },
+  { id: 'alfalah', name: 'Bank Alfalah', iban: 'PK36ALFH0012345678901234' },
+  { id: 'meezan', name: 'Meezan Bank (Islamic)', iban: 'PK36MEZN0012345678901234' },
+  { id: 'allied', name: 'Allied Bank', iban: 'PK36ABPL0012345678901234' },
+  { id: 'askari', name: 'Askari Bank', iban: 'PK36ASCM0012345678901234' },
+  { id: 'faysal', name: 'Faysal Bank', iban: 'PK36FAYS0012345678901234' },
+  { id: 'standard', name: 'Standard Chartered Pakistan', iban: 'PK36SCBL0012345678901234' },
+  { id: 'js', name: 'JS Bank', iban: 'PK36JSBL0012345678901234' },
+];
 
 const paymentMethods = [
   {
@@ -39,15 +53,14 @@ const paymentMethods = [
     id: 'bank_transfer',
     name: 'Bank Transfer',
     icon: Building2,
-    description: 'Direct bank transfer',
-    bankName: 'HBL - Habib Bank Limited',
-    accountNumber: 'PK36HABB0012345678901234',
+    description: 'Select your bank for direct transfer',
     accountTitle: 'Fresh Grocery PKR',
   },
 ] as const;
 
 export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: CheckoutDialogProps) {
   const [paymentMethod, setPaymentMethod] = useState<'easypaisa' | 'jazzcash' | 'bank_transfer'>('easypaisa');
+  const [selectedBank, setSelectedBank] = useState('hbl');
   const [senderAccount, setSenderAccount] = useState('');
   const [senderName, setSenderName] = useState('');
   const [step, setStep] = useState<'select' | 'details' | 'confirm'>('select');
@@ -55,6 +68,7 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
   const { toast } = useToast();
 
   const selectedMethod = paymentMethods.find(m => m.id === paymentMethod)!;
+  const selectedBankInfo = bankOptions.find(b => b.id === selectedBank);
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
@@ -139,6 +153,24 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
 
         {step === 'details' && (
           <div className="space-y-4">
+            {paymentMethod === 'bank_transfer' && (
+              <div className="space-y-2">
+                <Label>Select Your Bank</Label>
+                <Select value={selectedBank} onValueChange={setSelectedBank}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {bankOptions.map((bank) => (
+                      <SelectItem key={bank.id} value={bank.id}>
+                        {bank.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <Card className="bg-muted/50">
               <CardContent className="p-4 space-y-2">
                 <h3 className="font-semibold flex items-center gap-2">
@@ -146,10 +178,14 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
                   {selectedMethod.name} Payment Details
                 </h3>
                 <div className="text-sm space-y-1">
-                  {selectedMethod.id === 'bank_transfer' && (
-                    <p><span className="text-muted-foreground">Bank:</span> {selectedMethod.bankName}</p>
+                  {paymentMethod === 'bank_transfer' ? (
+                    <>
+                      <p><span className="text-muted-foreground">Our Bank:</span> {selectedBankInfo?.name}</p>
+                      <p><span className="text-muted-foreground">IBAN:</span> <span className="font-mono">{selectedBankInfo?.iban}</span></p>
+                    </>
+                  ) : (
+                    <p><span className="text-muted-foreground">Account Number:</span> <span className="font-mono">{'accountNumber' in selectedMethod ? selectedMethod.accountNumber : ''}</span></p>
                   )}
-                  <p><span className="text-muted-foreground">Account Number:</span> <span className="font-mono">{selectedMethod.accountNumber}</span></p>
                   <p><span className="text-muted-foreground">Account Title:</span> {selectedMethod.accountTitle}</p>
                   <p className="font-semibold text-primary">Amount: {formatPrice(amount)}</p>
                 </div>
