@@ -5,10 +5,18 @@ import { Footer } from '@/components/layout/Footer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/lib/auth-context';
 import { useSubscription, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription } from '@/hooks/useSubscription';
 import { CheckoutDialog } from '@/components/checkout/CheckoutDialog';
 import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard } from 'lucide-react';
+
+// Multipliers for subscription types
+const SUBSCRIPTION_MULTIPLIERS = {
+  weekly: 7,    // 7 days
+  monthly: 30,  // 30 days
+  yearly: 365,  // 365 days
+};
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
@@ -22,7 +30,12 @@ export default function Dashboard() {
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
-  const total = items?.reduce((sum, item) => sum + (item.product?.price_pkr || 0) * item.quantity, 0) || 0;
+  // Calculate base total (per day price × quantity)
+  const baseTotal = items?.reduce((sum, item) => sum + (item.product?.price_pkr || 0) * item.quantity, 0) || 0;
+  
+  // Apply multiplier based on subscription type
+  const multiplier = subscription ? SUBSCRIPTION_MULTIPLIERS[subscription.type as keyof typeof SUBSCRIPTION_MULTIPLIERS] || 1 : 1;
+  const total = baseTotal * multiplier;
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(price);
 
@@ -80,9 +93,23 @@ export default function Dashboard() {
                   <CardTitle>Subscription Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span>Type</span>
-                    <Badge>{subscription.type}</Badge>
+                    <Select 
+                      value={subscription.type} 
+                      onValueChange={(value: 'weekly' | 'monthly' | 'yearly') => {
+                        updateSubscription.mutate({ id: subscription.id, type: value });
+                      }}
+                    >
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div className="flex justify-between">
                     <span>Status</span>
@@ -95,8 +122,11 @@ export default function Dashboard() {
                     </div>
                   )}
                   <hr />
+                  <div className="text-sm text-muted-foreground">
+                    <p>Daily price per item × {multiplier} days</p>
+                  </div>
                   <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
+                    <span>Total ({subscription.type})</span>
                     <span className="text-primary">{formatPrice(total)}</span>
                   </div>
                   <Button className="w-full" onClick={() => setCheckoutOpen(true)} disabled={!items || items.length === 0}>
