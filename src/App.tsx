@@ -18,6 +18,7 @@ import AdminSubscriptions from "./pages/admin/AdminSubscriptions";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminRiders from "./pages/admin/AdminRiders";
 import RiderDashboard from "./pages/rider/RiderDashboard";
+import RiderLogin from "./pages/rider/RiderLogin";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             </Route>
             
             {/* Rider Routes */}
+            <Route path="/rider/login" element={<RiderLogin />} />
             <Route path="/rider" element={<RiderDashboard />} />
             
             <Route path="*" element={<NotFound />} />
