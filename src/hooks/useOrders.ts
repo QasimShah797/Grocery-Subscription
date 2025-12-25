@@ -98,10 +98,7 @@ export const useAllOrders = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('orders')
-        .select(`
-          *,
-          profiles:user_id (full_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;

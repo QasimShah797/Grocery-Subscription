@@ -247,7 +247,7 @@ export function useAllSubscriptions() {
         .from('subscriptions')
         .select(`
           *,
-          profile:profiles(full_name, email)
+          profiles!inner(full_name, email)
         `)
         .order('created_at', { ascending: false });
       

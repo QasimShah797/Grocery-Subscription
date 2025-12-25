@@ -57,10 +57,10 @@ export default function AdminSubscriptions() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {subscriptions?.map((sub) => (
+                {subscriptions?.map((sub: any) => (
                   <TableRow key={sub.id}>
                     <TableCell className="font-medium">
-                      {(sub as any).profiles?.full_name || (sub as any).profiles?.email || 'Unknown'}
+                      {sub.profiles?.full_name || sub.profiles?.email || sub.user_id.slice(0, 8) + '...'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{sub.type}</Badge>

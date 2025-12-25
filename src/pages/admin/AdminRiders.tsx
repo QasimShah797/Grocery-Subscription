@@ -193,8 +193,8 @@ export default function AdminRiders() {
               <TableBody>
                 {riders?.map((rider: any) => (
                   <TableRow key={rider.id}>
-                    <TableCell className="font-medium">{rider.profiles?.full_name || 'N/A'}</TableCell>
-                    <TableCell>{rider.profiles?.email || 'N/A'}</TableCell>
+                    <TableCell className="font-medium">{rider.user_id.slice(0, 8)}...</TableCell>
+                    <TableCell>-</TableCell>
                     <TableCell>{rider.phone}</TableCell>
                     <TableCell className="capitalize">{rider.vehicle_type}</TableCell>
                     <TableCell>

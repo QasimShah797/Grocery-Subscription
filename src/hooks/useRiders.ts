@@ -7,7 +7,7 @@ export function useRiders() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('riders')
-        .select('*, profiles:user_id(full_name, email)')
+        .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -71,7 +71,7 @@ export function useAvailableRiders() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('riders')
-        .select('*, profiles:user_id(full_name, email)')
+        .select('*')
         .eq('is_available', true)
         .order('created_at', { ascending: false });
       if (error) throw error;
