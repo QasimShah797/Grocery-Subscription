@@ -87,8 +87,11 @@ export function useCreateSubscription() {
       const nextRenewal = new Date();
       if (type === 'weekly') {
         nextRenewal.setDate(nextRenewal.getDate() + 7);
-      } else {
+      } else if (type === 'monthly') {
         nextRenewal.setMonth(nextRenewal.getMonth() + 1);
+      } else {
+        // yearly
+        nextRenewal.setFullYear(nextRenewal.getFullYear() + 1);
       }
       
       const { data, error } = await supabase
