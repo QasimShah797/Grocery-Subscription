@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,6 +72,23 @@ export default function RiderLogin() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          <div className="mt-6 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">
+              New rider?{' '}
+              <Link to="/rider/signup" className="text-primary hover:underline">
+                Sign up here
+              </Link>
+            </p>
+            <div className="pt-3 border-t border-border">
+              <Link 
+                to="/auth" 
+                className="text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                Customer login
+              </Link>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
