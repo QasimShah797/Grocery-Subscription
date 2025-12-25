@@ -9,17 +9,29 @@ export function useDeliveryAssignments() {
         .from('delivery_assignments')
         .select(`
           *,
-          orders!inner(
-            id,
-            amount_pkr,
-            payment_status,
-            user_id,
-            profiles:user_id(full_name, email, phone, address)
-          ),
-          riders(id, phone, profiles:user_id(full_name))
+          orders!inner(id, amount_pkr, payment_status, user_id),
+          riders(id, phone)
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
+      
+      // Fetch profiles separately
+      const userIds = [...new Set(data?.map(d => (d.orders as any)?.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, phone, address')
+          .in('id', userIds);
+        
+        return data?.map(d => ({
+          ...d,
+          orders: {
+            ...(d.orders as any),
+            profiles: profiles?.find(p => p.id === (d.orders as any)?.user_id)
+          }
+        }));
+      }
+      
       return data;
     },
   });
@@ -37,25 +49,39 @@ export function useRiderAssignments() {
         .from('riders')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (riderError) throw riderError;
+      if (!rider) return []; // User is not a rider
       
       const { data, error } = await supabase
         .from('delivery_assignments')
         .select(`
           *,
-          orders!inner(
-            id,
-            amount_pkr,
-            payment_status,
-            user_id,
-            profiles:user_id(full_name, email, phone, address)
-          )
+          orders!inner(id, amount_pkr, payment_status, user_id)
         `)
         .eq('rider_id', rider.id)
         .order('created_at', { ascending: false });
       if (error) throw error;
+      
+      // Fetch customer profiles separately
+      const userIds = [...new Set(data?.map(d => (d.orders as any)?.user_id).filter(Boolean))];
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, phone, address')
+          .in('id', userIds);
+        
+        // Attach profiles to orders
+        return data?.map(d => ({
+          ...d,
+          orders: {
+            ...(d.orders as any),
+            profiles: profiles?.find(p => p.id === (d.orders as any)?.user_id)
+          }
+        }));
+      }
+      
       return data;
     },
   });

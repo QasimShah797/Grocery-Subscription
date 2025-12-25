@@ -1,15 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRiderAssignments, useUpdateDeliveryStatus } from '@/hooks/useDeliveryAssignments';
-import { Loader2, MapPin, Phone, User, Package, CheckCircle } from 'lucide-react';
+import { Loader2, MapPin, Phone, User, Package, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/auth-context';
+import { useNavigate } from 'react-router-dom';
 
 export default function RiderDashboard() {
+  const { user, isRider, loading: authLoading } = useAuth();
   const { data: assignments, isLoading } = useRiderAssignments();
   const updateStatus = useUpdateDeliveryStatus();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
@@ -40,10 +43,52 @@ export default function RiderDashboard() {
   const pendingDeliveries = assignments?.filter(a => a.status !== 'delivered' && a.status !== 'cancelled') || [];
   const completedDeliveries = assignments?.filter(a => a.status === 'delivered') || [];
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Login Required</h2>
+            <p className="text-muted-foreground mb-4">Please login to access the rider dashboard.</p>
+            <button 
+              onClick={() => navigate('/auth')}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
+            >
+              Go to Login
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isRider) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+            <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
+            <p className="text-muted-foreground mb-4">
+              You don't have rider access. Please contact admin to be assigned as a rider.
+            </p>
+            <button 
+              onClick={() => navigate('/')}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
+            >
+              Go to Home
+            </button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
