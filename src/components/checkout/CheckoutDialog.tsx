@@ -63,7 +63,7 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
   const [selectedBank, setSelectedBank] = useState('hbl');
   const [senderAccount, setSenderAccount] = useState('');
   const [senderName, setSenderName] = useState('');
-  const [step, setStep] = useState<'select' | 'details' | 'confirm'>('select');
+  const [step, setStep] = useState<'select' | 'details' | 'confirm' | 'success'>('select');
   const createOrder = useCreateOrder();
   const { toast } = useToast();
 
@@ -75,6 +75,16 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
     currency: 'PKR', 
     minimumFractionDigits: 0 
   }).format(price);
+
+  const handleClose = () => {
+    onOpenChange(false);
+    // Reset form after dialog closes
+    setTimeout(() => {
+      setStep('select');
+      setSenderAccount('');
+      setSenderName('');
+    }, 300);
+  };
 
   const handleSubmit = async () => {
     try {
@@ -88,15 +98,7 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
         },
       });
       
-      toast({
-        title: 'Order Placed Successfully!',
-        description: 'Please complete your payment. We will verify and confirm your order.',
-      });
-      
-      onOpenChange(false);
-      setStep('select');
-      setSenderAccount('');
-      setSenderName('');
+      setStep('success');
     } catch {
       toast({
         title: 'Error',
@@ -107,13 +109,14 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={step === 'success' ? handleClose : onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-xl font-display">
             {step === 'select' && 'Select Payment Method'}
             {step === 'details' && 'Payment Details'}
             {step === 'confirm' && 'Confirm Payment'}
+            {step === 'success' && 'Order Placed Successfully!'}
           </DialogTitle>
         </DialogHeader>
 
@@ -269,6 +272,36 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
                 )}
               </Button>
             </div>
+          </div>
+        )}
+
+        {step === 'success' && (
+          <div className="space-y-4 text-center py-4">
+            <div className="w-16 h-16 mx-auto bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-lg font-semibold">Your order has been placed!</p>
+              <p className="text-muted-foreground">
+                Please transfer <span className="font-semibold text-primary">{formatPrice(amount)}</span> to complete your payment.
+              </p>
+            </div>
+
+            <div className="p-4 bg-muted rounded-lg text-sm text-left">
+              <p className="font-semibold mb-2">What's next?</p>
+              <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+                <li>Transfer the amount using {selectedMethod.name}</li>
+                <li>We'll verify your payment within 1-2 hours</li>
+                <li>Your order will be confirmed via notification</li>
+              </ol>
+            </div>
+
+            <Button className="w-full" onClick={handleClose}>
+              Done
+            </Button>
           </div>
         )}
       </DialogContent>
