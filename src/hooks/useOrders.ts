@@ -51,7 +51,7 @@ export const useOrdersWithDelivery = () => {
             delivered_at,
             riders(
               phone,
-              profiles:user_id(full_name)
+              vehicle_type
             )
           )
         `)

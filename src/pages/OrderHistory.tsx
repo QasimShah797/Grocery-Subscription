@@ -122,7 +122,7 @@ export default function OrderHistory() {
                             <p className="font-medium">{getDeliveryStatusText(delivery?.status)}</p>
                             {rider && (
                               <p className="text-sm text-muted-foreground">
-                                Rider: {rider.profiles?.full_name || 'Assigned'} • {rider.phone}
+                                Rider: {rider.phone} • {rider.vehicle_type || 'Bike'}
                               </p>
                             )}
                             {delivery?.delivered_at && (
