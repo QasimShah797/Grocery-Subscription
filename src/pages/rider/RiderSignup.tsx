@@ -61,21 +61,22 @@ export default function RiderSignup() {
           console.error('Error adding rider role:', roleError);
         }
 
-        // Create rider profile
+        // Create rider profile with pending status
         const { error: riderError } = await supabase
           .from('riders')
           .insert({
             user_id: authData.user.id,
             phone: phone,
             vehicle_type: vehicleType,
-            is_available: true,
+            is_available: false,
+            status: 'pending',
           });
 
         if (riderError) {
           console.error('Error creating rider profile:', riderError);
         }
 
-        toast.success('Rider account created! Welcome to FreshBox.');
+        toast.success('Account created! Your application is pending admin approval.');
         navigate('/rider');
       }
     } catch (error: any) {

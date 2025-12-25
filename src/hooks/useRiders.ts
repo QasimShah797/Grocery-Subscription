@@ -40,7 +40,7 @@ export function useCreateRider() {
 export function useUpdateRider() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; phone?: string; vehicle_type?: string; is_available?: boolean }) => {
+    mutationFn: async ({ id, ...updates }: { id: string; phone?: string; vehicle_type?: string; is_available?: boolean; status?: string }) => {
       const { data, error } = await supabase
         .from('riders')
         .update(updates)
@@ -48,6 +48,35 @@ export function useUpdateRider() {
         .select()
         .single();
       if (error) throw error;
+      return data;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['riders'] }),
+  });
+}
+
+export function useApproveRider() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, user_id, approved }: { id: string; user_id: string; approved: boolean }) => {
+      const status = approved ? 'approved' : 'rejected';
+      
+      // Update rider status
+      const { data, error } = await supabase
+        .from('riders')
+        .update({ status, is_available: approved })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+
+      // If approved, ensure rider role exists
+      if (approved) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert({ user_id, role: 'rider' }, { onConflict: 'user_id,role' });
+        if (roleError) console.error('Error adding rider role:', roleError);
+      }
+
       return data;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['riders'] }),
@@ -73,6 +102,22 @@ export function useAvailableRiders() {
         .from('riders')
         .select('*')
         .eq('is_available', true)
+        .eq('status', 'approved')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function usePendingRiders() {
+  return useQuery({
+    queryKey: ['riders', 'pending'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('riders')
+        .select('*')
+        .eq('status', 'pending')
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;

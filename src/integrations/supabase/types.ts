@@ -187,6 +187,7 @@ export type Database = {
           id: string
           is_available: boolean | null
           phone: string
+          status: string
           updated_at: string | null
           user_id: string
           vehicle_type: string | null
@@ -196,6 +197,7 @@ export type Database = {
           id?: string
           is_available?: boolean | null
           phone: string
+          status?: string
           updated_at?: string | null
           user_id: string
           vehicle_type?: string | null
@@ -205,6 +207,7 @@ export type Database = {
           id?: string
           is_available?: boolean | null
           phone?: string
+          status?: string
           updated_at?: string | null
           user_id?: string
           vehicle_type?: string | null

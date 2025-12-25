@@ -2,10 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRiderAssignments, useUpdateDeliveryStatus } from '@/hooks/useDeliveryAssignments';
-import { Loader2, MapPin, Phone, User, Package, CheckCircle, AlertCircle } from 'lucide-react';
+import { Loader2, MapPin, Phone, User, Package, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 export default function RiderDashboard() {
   const { user, isRider, loading: authLoading } = useAuth();
@@ -13,6 +15,21 @@ export default function RiderDashboard() {
   const updateStatus = useUpdateDeliveryStatus();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Check rider approval status
+  const { data: riderProfile, isLoading: riderLoading } = useQuery({
+    queryKey: ['rider_profile', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('riders')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
@@ -43,7 +60,7 @@ export default function RiderDashboard() {
   const pendingDeliveries = assignments?.filter(a => a.status !== 'delivered' && a.status !== 'cancelled') || [];
   const completedDeliveries = assignments?.filter(a => a.status === 'delivered') || [];
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || riderLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin" />
@@ -60,7 +77,7 @@ export default function RiderDashboard() {
             <h2 className="text-xl font-semibold mb-2">Login Required</h2>
             <p className="text-muted-foreground mb-4">Please login to access the rider dashboard.</p>
             <button 
-              onClick={() => navigate('/auth')}
+              onClick={() => navigate('/rider/login')}
               className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
             >
               Go to Login
@@ -71,7 +88,53 @@ export default function RiderDashboard() {
     );
   }
 
-  if (!isRider) {
+  // Check if rider has pending approval
+  if (riderProfile?.status === 'pending') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-6 text-center">
+            <Clock className="w-12 h-12 mx-auto mb-4 text-yellow-500" />
+            <h2 className="text-xl font-semibold mb-2">Application Pending</h2>
+            <p className="text-muted-foreground mb-4">
+              Your rider application is being reviewed by our admin team. You'll be able to access the dashboard once approved.
+            </p>
+            <button 
+              onClick={() => navigate('/')}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
+            >
+              Go to Home
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Check if rider was rejected
+  if (riderProfile?.status === 'rejected') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="w-full max-w-md mx-4">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
+            <h2 className="text-xl font-semibold mb-2">Application Rejected</h2>
+            <p className="text-muted-foreground mb-4">
+              Unfortunately, your rider application was not approved. Please contact support for more information.
+            </p>
+            <button 
+              onClick={() => navigate('/')}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
+            >
+              Go to Home
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isRider && !riderProfile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="w-full max-w-md mx-4">
@@ -79,13 +142,13 @@ export default function RiderDashboard() {
             <AlertCircle className="w-12 h-12 mx-auto mb-4 text-destructive" />
             <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
             <p className="text-muted-foreground mb-4">
-              You don't have rider access. Please contact admin to be assigned as a rider.
+              You don't have rider access. Please sign up as a rider to get started.
             </p>
             <button 
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/rider/signup')}
               className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
             >
-              Go to Home
+              Become a Rider
             </button>
           </CardContent>
         </Card>

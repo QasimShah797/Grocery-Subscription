@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,8 +7,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useRiders, useCreateRider, useUpdateRider, useDeleteRider } from '@/hooks/useRiders';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useRiders, useCreateRider, useUpdateRider, useDeleteRider, usePendingRiders, useApproveRider } from '@/hooks/useRiders';
+import { Plus, Pencil, Trash2, Loader2, Check, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -27,9 +29,11 @@ const emptyForm: RiderForm = {
 
 export default function AdminRiders() {
   const { data: riders, isLoading } = useRiders();
+  const { data: pendingRiders, isLoading: pendingLoading } = usePendingRiders();
   const createRider = useCreateRider();
   const updateRider = useUpdateRider();
   const deleteRider = useDeleteRider();
+  const approveRider = useApproveRider();
   const { toast } = useToast();
   
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -52,6 +56,8 @@ export default function AdminRiders() {
     enabled: dialogOpen && !editingId,
   });
 
+  const approvedRiders = riders?.filter((r: any) => r.status === 'approved') || [];
+
   const handleEdit = (rider: any) => {
     setEditingId(rider.id);
     setForm({
@@ -70,6 +76,15 @@ export default function AdminRiders() {
       } catch {
         toast({ title: 'Failed to remove rider', variant: 'destructive' });
       }
+    }
+  };
+
+  const handleApproval = async (rider: any, approved: boolean) => {
+    try {
+      await approveRider.mutateAsync({ id: rider.id, user_id: rider.user_id, approved });
+      toast({ title: approved ? 'Rider approved successfully' : 'Rider rejected' });
+    } catch {
+      toast({ title: 'Failed to update rider status', variant: 'destructive' });
     }
   };
 
@@ -108,6 +123,15 @@ export default function AdminRiders() {
     setEditingId(null);
     setForm(emptyForm);
     setDialogOpen(true);
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved': return <Badge className="bg-green-100 text-green-700">Approved</Badge>;
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700">Pending</Badge>;
+      case 'rejected': return <Badge className="bg-red-100 text-red-700">Rejected</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   return (
@@ -174,50 +198,162 @@ export default function AdminRiders() {
         </Dialog>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Vehicle</TableHead>
-                  <TableHead>Available</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {riders?.map((rider: any) => (
-                  <TableRow key={rider.id}>
-                    <TableCell className="font-medium">{rider.user_id.slice(0, 8)}...</TableCell>
-                    <TableCell>-</TableCell>
-                    <TableCell>{rider.phone}</TableCell>
-                    <TableCell className="capitalize">{rider.vehicle_type}</TableCell>
-                    <TableCell>
-                      <Switch 
-                        checked={rider.is_available} 
-                        onCheckedChange={(checked) => handleAvailabilityToggle(rider.id, checked)}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="icon" variant="ghost" onClick={() => handleEdit(rider)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDelete(rider.id)}>
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="pending">
+        <TabsList>
+          <TabsTrigger value="pending" className="relative">
+            Pending Approval
+            {pendingRiders && pendingRiders.length > 0 && (
+              <span className="ml-2 bg-destructive text-destructive-foreground text-xs rounded-full px-2 py-0.5">
+                {pendingRiders.length}
+              </span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="approved">Approved Riders</TabsTrigger>
+          <TabsTrigger value="all">All Riders</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pending Rider Applications</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {pendingLoading ? (
+                <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+              ) : pendingRiders?.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">No pending applications</div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Applied</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingRiders?.map((rider: any) => (
+                      <TableRow key={rider.id}>
+                        <TableCell>{rider.phone}</TableCell>
+                        <TableCell className="capitalize">{rider.vehicle_type}</TableCell>
+                        <TableCell>{new Date(rider.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button 
+                            size="sm" 
+                            variant="default"
+                            onClick={() => handleApproval(rider, true)}
+                            disabled={approveRider.isPending}
+                          >
+                            <Check className="w-4 h-4 mr-1" /> Approve
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive"
+                            onClick={() => handleApproval(rider, false)}
+                            disabled={approveRider.isPending}
+                          >
+                            <X className="w-4 h-4 mr-1" /> Reject
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="approved">
+          <Card>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Available</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {approvedRiders.map((rider: any) => (
+                      <TableRow key={rider.id}>
+                        <TableCell>{rider.phone}</TableCell>
+                        <TableCell className="capitalize">{rider.vehicle_type}</TableCell>
+                        <TableCell>
+                          <Switch 
+                            checked={rider.is_available} 
+                            onCheckedChange={(checked) => handleAvailabilityToggle(rider.id, checked)}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="icon" variant="ghost" onClick={() => handleEdit(rider)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDelete(rider.id)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="all">
+          <Card>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Vehicle</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Available</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {riders?.map((rider: any) => (
+                      <TableRow key={rider.id}>
+                        <TableCell>{rider.phone}</TableCell>
+                        <TableCell className="capitalize">{rider.vehicle_type}</TableCell>
+                        <TableCell>{getStatusBadge(rider.status)}</TableCell>
+                        <TableCell>
+                          <Switch 
+                            checked={rider.is_available} 
+                            onCheckedChange={(checked) => handleAvailabilityToggle(rider.id, checked)}
+                            disabled={rider.status !== 'approved'}
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="icon" variant="ghost" onClick={() => handleEdit(rider)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => handleDelete(rider.id)}>
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
