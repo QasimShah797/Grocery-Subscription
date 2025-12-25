@@ -33,6 +33,37 @@ export const useOrders = () => {
   });
 };
 
+export const useOrdersWithDelivery = () => {
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ['orders-with-delivery', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('orders')
+        .select(`
+          *,
+          delivery_assignments(
+            id,
+            status,
+            assigned_at,
+            picked_up_at,
+            delivered_at,
+            riders(
+              phone,
+              profiles:user_id(full_name)
+            )
+          )
+        `)
+        .eq('user_id', user!.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+};
+
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();

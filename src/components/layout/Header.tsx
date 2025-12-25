@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
-import { ShoppingBag, User, LogOut, Menu, X, Leaf, Settings } from 'lucide-react';
+import { ShoppingBag, User, LogOut, Menu, X, Leaf, Settings, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 
 export function Header() {
@@ -34,9 +34,14 @@ export function Header() {
               Products
             </Link>
             {user && (
-              <Link to="/dashboard" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                My Subscription
-              </Link>
+              <>
+                <Link to="/dashboard" className="text-muted-foreground hover:text-primary transition-colors font-medium">
+                  My Subscription
+                </Link>
+                <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors font-medium">
+                  Orders
+                </Link>
+              </>
             )}
           </nav>
 
@@ -52,6 +57,12 @@ export function Header() {
                     </Button>
                   </Link>
                 )}
+                <Link to="/orders">
+                  <Button variant="outline" size="sm">
+                    <ClipboardList className="w-4 h-4" />
+                    Orders
+                  </Button>
+                </Link>
                 <Link to="/dashboard">
                   <Button variant="outline" size="sm">
                     <ShoppingBag className="w-4 h-4" />
@@ -100,13 +111,22 @@ export function Header() {
                 Products
               </Link>
               {user && (
-                <Link
-                  to="/dashboard"
-                  className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  My Subscription
-                </Link>
+                <>
+                  <Link
+                    to="/dashboard"
+                    className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    My Subscription
+                  </Link>
+                  <Link
+                    to="/orders"
+                    className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Order History
+                  </Link>
+                </>
               )}
               {isAdmin && (
                 <Link
