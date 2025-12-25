@@ -18,6 +18,9 @@ const SUBSCRIPTION_MULTIPLIERS = {
   yearly: 365,  // 365 days
 };
 
+// Discount for yearly subscription
+const YEARLY_DISCOUNT = 0.10; // 10% off
+
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const { data: subscription } = useSubscription();
@@ -35,7 +38,12 @@ export default function Dashboard() {
   
   // Apply multiplier based on subscription type
   const multiplier = subscription ? SUBSCRIPTION_MULTIPLIERS[subscription.type as keyof typeof SUBSCRIPTION_MULTIPLIERS] || 1 : 1;
-  const total = baseTotal * multiplier;
+  const subtotal = baseTotal * multiplier;
+  
+  // Apply yearly discount
+  const isYearly = subscription?.type === 'yearly';
+  const discount = isYearly ? subtotal * YEARLY_DISCOUNT : 0;
+  const total = subtotal - discount;
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { style: 'currency', currency: 'PKR', minimumFractionDigits: 0 }).format(price);
 
@@ -122,9 +130,24 @@ export default function Dashboard() {
                     </div>
                   )}
                   <hr />
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground space-y-1">
                     <p>Daily price per item × {multiplier} days</p>
+                    {isYearly && (
+                      <p className="text-green-600 font-medium">🎉 10% yearly discount applied!</p>
+                    )}
                   </div>
+                  {isYearly && (
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal</span>
+                      <span className="line-through text-muted-foreground">{formatPrice(subtotal)}</span>
+                    </div>
+                  )}
+                  {isYearly && discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Discount (10%)</span>
+                      <span>-{formatPrice(discount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total ({subscription.type})</span>
                     <span className="text-primary">{formatPrice(total)}</span>

@@ -120,11 +120,11 @@ export default function Products() {
                   <span className="text-sm text-muted-foreground block">Price × 30 days</span>
                 </Label>
               </div>
-              <div className="flex items-center space-x-3 p-3 border rounded-lg">
+              <div className="flex items-center space-x-3 p-3 border rounded-lg border-green-200 bg-green-50 dark:bg-green-900/20">
                 <RadioGroupItem value="yearly" id="yearly" />
                 <Label htmlFor="yearly" className="flex-1 cursor-pointer">
-                  <span className="font-semibold">Yearly</span>
-                  <span className="text-sm text-muted-foreground block">Price × 365 days</span>
+                  <span className="font-semibold">Yearly <span className="text-green-600 text-xs ml-1">10% OFF</span></span>
+                  <span className="text-sm text-muted-foreground block">Price × 365 days - Best value!</span>
                 </Label>
               </div>
             </RadioGroup>
