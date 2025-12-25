@@ -139,13 +139,21 @@ export default function Auth() {
             >
               {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
             </button>
-            <div className="pt-3 border-t border-border">
+            <div className="pt-3 border-t border-border flex items-center justify-center gap-4">
               <Link 
                 to="/rider/login" 
                 className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
               >
                 <Bike className="w-4 h-4" />
                 Rider Login
+              </Link>
+              <span className="text-muted-foreground">|</span>
+              <Link 
+                to="/rider/signup" 
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+              >
+                <Bike className="w-4 h-4" />
+                Become a Rider
               </Link>
             </div>
           </div>
