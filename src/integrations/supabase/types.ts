@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      delivery_assignments: {
+        Row: {
+          assigned_at: string | null
+          created_at: string | null
+          delivered_at: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          picked_up_at: string | null
+          rider_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          picked_up_at?: string | null
+          rider_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          picked_up_at?: string | null
+          rider_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_assignments_rider_id_fkey"
+            columns: ["rider_id"]
+            isOneToOne: false
+            referencedRelation: "riders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
           amount_pkr: number
@@ -127,6 +181,36 @@ export type Database = {
         }
         Relationships: []
       }
+      riders: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_available: boolean | null
+          phone: string
+          updated_at: string | null
+          user_id: string
+          vehicle_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_available?: boolean | null
+          phone: string
+          updated_at?: string | null
+          user_id: string
+          vehicle_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_available?: boolean | null
+          phone?: string
+          updated_at?: string | null
+          user_id?: string
+          vehicle_type?: string | null
+        }
+        Relationships: []
+      }
       subscription_items: {
         Row: {
           created_at: string | null
@@ -234,7 +318,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "rider"
       subscription_status: "active" | "paused" | "cancelled"
       subscription_type: "weekly" | "monthly"
     }
@@ -364,7 +448,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "rider"],
       subscription_status: ["active", "paused", "cancelled"],
       subscription_type: ["weekly", "monthly"],
     },
