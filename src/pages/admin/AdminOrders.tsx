@@ -137,7 +137,7 @@ export default function AdminOrders() {
                     <TableRow key={order.id}>
                       <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}...</TableCell>
                       <TableCell className="font-medium">
-                        {(order as any).profiles?.full_name || (order as any).profiles?.email || 'Unknown'}
+                        {order.user_id.slice(0, 8)}...
                       </TableCell>
                       <TableCell>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentMethodColor(order.payment_method)}`}>
@@ -237,7 +237,7 @@ export default function AdminOrders() {
                         <SelectContent>
                           {riders?.map((rider: any) => (
                             <SelectItem key={rider.id} value={rider.id}>
-                              {rider.profiles?.full_name || rider.phone} - {rider.vehicle_type}
+                              {rider.phone} - {rider.vehicle_type}
                             </SelectItem>
                           ))}
                         </SelectContent>
