@@ -319,6 +319,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_rider_assigned_to_order: {
+        Args: { _order_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user" | "rider"
