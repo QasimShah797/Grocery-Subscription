@@ -19,10 +19,16 @@ export default function RiderLogin() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await signIn(email, password);
+    const { error, isRider } = await signIn(email, password);
 
     if (error) {
       toast.error(error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (!isRider) {
+      toast.error('This account is not registered as a rider');
       setLoading(false);
       return;
     }
