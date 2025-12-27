@@ -9,7 +9,7 @@ interface AuthContextType {
   isRider: boolean;
   loading: boolean;
   signUp: (email: string, password: string, fullName: string, address: string, phone: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; isAdmin: boolean; isRider: boolean }>;
   signOut: () => Promise<void>;
 }
 
@@ -82,11 +82,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { error: error as Error | null };
+    
+    if (error || !data.user) {
+      return { error: error as Error | null, isAdmin: false, isRider: false };
+    }
+
+    // Fetch roles immediately after login
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', data.user.id);
+    
+    const roles = rolesData?.map(r => r.role) || [];
+    const userIsAdmin = roles.includes('admin');
+    const userIsRider = roles.includes('rider');
+    
+    setIsAdmin(userIsAdmin);
+    setIsRider(userIsRider);
+    
+    return { error: null, isAdmin: userIsAdmin, isRider: userIsRider };
   };
 
   const signOut = async () => {

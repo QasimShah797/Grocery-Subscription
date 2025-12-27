@@ -43,9 +43,18 @@ export default function Auth() {
         toast.success('Account created! Welcome to FreshBox.');
       } else {
         loginSchema.parse({ email, password });
-        const { error } = await signIn(email, password);
+        const { error, isAdmin, isRider } = await signIn(email, password);
         if (error) throw error;
         toast.success('Welcome back!');
+        
+        // Role-based redirect
+        if (isAdmin) {
+          navigate('/admin');
+          return;
+        } else if (isRider) {
+          navigate('/rider');
+          return;
+        }
       }
       navigate('/dashboard');
     } catch (error: any) {
