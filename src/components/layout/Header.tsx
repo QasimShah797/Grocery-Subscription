@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth-context';
 import { ShoppingBag, User, LogOut, Menu, X, Leaf, Settings, ClipboardList, Bike } from 'lucide-react';
@@ -7,7 +7,12 @@ import { useState } from 'react';
 export function Header() {
   const { user, signOut, isAdmin, isRider } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Check if we're on admin or rider pages
+  const isOnAdminPages = location.pathname.startsWith('/admin');
+  const isOnRiderPages = location.pathname.startsWith('/rider');
 
   const handleSignOut = async () => {
     await signOut();
@@ -28,28 +33,31 @@ export function Header() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
-            <Link to="/products" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-              Products
-            </Link>
-            {user && (
-              <>
-                <Link to="/dashboard" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  My Subscription
-                </Link>
-                <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors font-medium">
-                  Orders
-                </Link>
-              </>
-            )}
-          </nav>
+          {/* Desktop Navigation - Hide on admin/rider pages */}
+          {!isOnAdminPages && !isOnRiderPages && (
+            <nav className="hidden md:flex items-center gap-6">
+              <Link to="/products" className="text-muted-foreground hover:text-primary transition-colors font-medium">
+                Products
+              </Link>
+              {user && (
+                <>
+                  <Link to="/dashboard" className="text-muted-foreground hover:text-primary transition-colors font-medium">
+                    My Subscription
+                  </Link>
+                  <Link to="/orders" className="text-muted-foreground hover:text-primary transition-colors font-medium">
+                    Orders
+                  </Link>
+                </>
+              )}
+            </nav>
+          )}
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-3">
             {user ? (
               <>
-                {isRider && (
+                {/* Only show role-specific buttons when NOT on those pages */}
+                {isRider && !isOnRiderPages && !isOnAdminPages && (
                   <Link to="/rider">
                     <Button variant="outline" size="sm">
                       <Bike className="w-4 h-4" />
@@ -57,7 +65,7 @@ export function Header() {
                     </Button>
                   </Link>
                 )}
-                {isAdmin && (
+                {isAdmin && !isOnAdminPages && (
                   <Link to="/admin">
                     <Button variant="outline" size="sm">
                       <Settings className="w-4 h-4" />
@@ -65,18 +73,23 @@ export function Header() {
                     </Button>
                   </Link>
                 )}
-                <Link to="/orders">
-                  <Button variant="outline" size="sm">
-                    <ClipboardList className="w-4 h-4" />
-                    Orders
-                  </Button>
-                </Link>
-                <Link to="/dashboard">
-                  <Button variant="outline" size="sm">
-                    <ShoppingBag className="w-4 h-4" />
-                    Dashboard
-                  </Button>
-                </Link>
+                {/* Hide user navigation on admin/rider pages */}
+                {!isOnAdminPages && !isOnRiderPages && (
+                  <>
+                    <Link to="/orders">
+                      <Button variant="outline" size="sm">
+                        <ClipboardList className="w-4 h-4" />
+                        Orders
+                      </Button>
+                    </Link>
+                    <Link to="/dashboard">
+                      <Button variant="outline" size="sm">
+                        <ShoppingBag className="w-4 h-4" />
+                        Dashboard
+                      </Button>
+                    </Link>
+                  </>
+                )}
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="w-4 h-4" />
                   Logout
@@ -111,32 +124,37 @@ export function Header() {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-border animate-slide-up">
             <nav className="flex flex-col gap-2">
-              <Link
-                to="/products"
-                className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Products
-              </Link>
-              {user && (
+              {/* Hide user navigation on admin/rider pages */}
+              {!isOnAdminPages && !isOnRiderPages && (
                 <>
                   <Link
-                    to="/dashboard"
+                    to="/products"
                     className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    My Subscription
+                    Products
                   </Link>
-                  <Link
-                    to="/orders"
-                    className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Order History
-                  </Link>
+                  {user && (
+                    <>
+                      <Link
+                        to="/dashboard"
+                        className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        My Subscription
+                      </Link>
+                      <Link
+                        to="/orders"
+                        className="px-4 py-2 rounded-lg hover:bg-muted transition-colors"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Order History
+                      </Link>
+                    </>
+                  )}
                 </>
               )}
-              {isRider && (
+              {isRider && !isOnRiderPages && !isOnAdminPages && (
                 <Link
                   to="/rider"
                   className="px-4 py-2 rounded-lg hover:bg-muted transition-colors text-primary font-medium"
@@ -145,7 +163,7 @@ export function Header() {
                   Rider Dashboard
                 </Link>
               )}
-              {isAdmin && (
+              {isAdmin && !isOnAdminPages && (
                 <Link
                   to="/admin"
                   className="px-4 py-2 rounded-lg hover:bg-muted transition-colors text-primary font-medium"
