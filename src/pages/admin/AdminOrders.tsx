@@ -199,10 +199,21 @@ export default function AdminOrders() {
               </div>
 
               {selectedOrder.payment_details && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Sender Details:</p>
-                  <p className="text-sm">Name: {selectedOrder.payment_details.sender_name}</p>
-                  <p className="text-sm">Account: {selectedOrder.payment_details.sender_account}</p>
+                <div className="p-3 bg-muted rounded-lg space-y-2">
+                  <p className="text-sm font-medium">Sender Details:</p>
+                  <div className="text-sm space-y-1">
+                    <p><span className="text-muted-foreground">Name:</span> {selectedOrder.payment_details.sender_name}</p>
+                    <p><span className="text-muted-foreground">Account:</span> {selectedOrder.payment_details.sender_account}</p>
+                    {selectedOrder.payment_details.sender_mobile && (
+                      <p><span className="text-muted-foreground">Mobile:</span> {selectedOrder.payment_details.sender_mobile}</p>
+                    )}
+                  </div>
+                  {selectedOrder.payment_details.delivery_address && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm font-medium">Delivery Address:</p>
+                      <p className="text-sm text-muted-foreground">{selectedOrder.payment_details.delivery_address}</p>
+                    </div>
+                  )}
                 </div>
               )}
 
