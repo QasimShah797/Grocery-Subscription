@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import { useAllOrders, useUpdateOrderStatus } from '@/hooks/useOrders';
 import { useAvailableRiders } from '@/hooks/useRiders';
-import { useDeliveryAssignments, useCreateDeliveryAssignment, useAssignRider } from '@/hooks/useDeliveryAssignments';
-import { Loader2, Eye, Truck } from 'lucide-react';
+import { useDeliveryAssignments, useCreateDeliveryAssignment, useAssignRider, useDailyDeliveries } from '@/hooks/useDeliveryAssignments';
+import { Loader2, Eye, Truck, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 
@@ -24,6 +25,11 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [transactionId, setTransactionId] = useState('');
   const [selectedRider, setSelectedRider] = useState('');
+  const [subscriptionDays, setSubscriptionDays] = useState('7');
+
+  // Get current assignment for selected order
+  const currentAssignment = deliveryAssignments?.find((a: any) => a.order_id === selectedOrder?.id);
+  const { data: dailyDeliveries } = useDailyDeliveries(currentAssignment?.id || null);
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
@@ -48,31 +54,38 @@ export default function AdminOrders() {
       return;
     }
     
+    const totalDays = parseInt(subscriptionDays) || 7;
+    
     try {
       // Check if delivery assignment exists for this order
       const existingAssignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
       
       if (existingAssignment) {
-        await assignRider.mutateAsync({ id: existingAssignment.id, rider_id: selectedRider });
+        await assignRider.mutateAsync({ id: existingAssignment.id, rider_id: selectedRider, total_days: totalDays });
       } else {
-        await createDeliveryAssignment.mutateAsync({ order_id: orderId, rider_id: selectedRider });
+        await createDeliveryAssignment.mutateAsync({ order_id: orderId, rider_id: selectedRider, total_days: totalDays });
       }
       
       toast({ title: 'Rider assigned successfully' });
       setSelectedRider('');
+      setSubscriptionDays('7');
       setSelectedOrder(null);
     } catch {
       toast({ title: 'Failed to assign rider', variant: 'destructive' });
     }
   };
 
+  const getDeliveryAssignment = (orderId: string) => {
+    return deliveryAssignments?.find((a: any) => a.order_id === orderId);
+  };
+
   const getDeliveryStatus = (orderId: string) => {
-    const assignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
+    const assignment = getDeliveryAssignment(orderId);
     return assignment?.status || null;
   };
 
   const getAssignedRider = (orderId: string) => {
-    const assignment = deliveryAssignments?.find((a: any) => a.order_id === orderId);
+    const assignment = getDeliveryAssignment(orderId);
     return assignment?.riders;
   };
 
@@ -149,13 +162,22 @@ export default function AdminOrders() {
                         <Badge variant={getStatusColor(order.payment_status) as any}>{order.payment_status}</Badge>
                       </TableCell>
                       <TableCell>
-                        {deliveryStatus ? (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(deliveryStatus)}`}>
-                            {deliveryStatus}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">Not assigned</span>
-                        )}
+                        {(() => {
+                          const assignment = getDeliveryAssignment(order.id);
+                          if (assignment) {
+                            return (
+                              <div className="space-y-1">
+                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDeliveryStatusColor(assignment.status || 'pending')}`}>
+                                  {assignment.status}
+                                </span>
+                                <p className="text-xs text-muted-foreground">
+                                  {assignment.delivered_days || 0}/{assignment.total_days || 0} days
+                                </p>
+                              </div>
+                            );
+                          }
+                          return <span className="text-muted-foreground text-xs">Not assigned</span>;
+                        })()}
                       </TableCell>
                       <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
@@ -224,45 +246,92 @@ export default function AdminOrders() {
                   <h3 className="font-semibold">Delivery Assignment</h3>
                 </div>
                 
-                {getAssignedRider(selectedOrder.id) ? (
-                  <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Assigned to:</span>{' '}
-                      <span className="font-medium">{(getAssignedRider(selectedOrder.id) as any)?.profiles?.full_name || 'Rider'}</span>
-                    </p>
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Status:</span>{' '}
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getDeliveryStatusColor(getDeliveryStatus(selectedOrder.id) || 'pending')}`}>
-                        {getDeliveryStatus(selectedOrder.id)}
-                      </span>
-                    </p>
+                {currentAssignment ? (
+                  <div className="space-y-3">
+                    <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg space-y-2">
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Assigned to:</span>{' '}
+                        <span className="font-medium">{(currentAssignment.riders as any)?.phone || 'Rider'}</span>
+                      </p>
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Status:</span>{' '}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getDeliveryStatusColor(currentAssignment.status || 'pending')}`}>
+                          {currentAssignment.status}
+                        </span>
+                      </p>
+                      <div className="pt-2 border-t space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Delivery Progress</span>
+                          <span className="font-semibold">{currentAssignment.delivered_days || 0} / {currentAssignment.total_days || 0} days</span>
+                        </div>
+                        <Progress 
+                          value={((currentAssignment.delivered_days || 0) / (currentAssignment.total_days || 1)) * 100} 
+                          className="h-2" 
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Daily deliveries breakdown */}
+                    {dailyDeliveries && dailyDeliveries.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                          <Calendar className="w-4 h-4" />
+                          Daily Deliveries
+                        </div>
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {dailyDeliveries.map((daily: any) => (
+                            <div key={daily.id} className="flex justify-between items-center p-2 bg-muted/50 rounded text-sm">
+                              <span>Day {daily.day_number} - {new Date(daily.delivery_date).toLocaleDateString()}</span>
+                              <Badge variant={daily.status === 'delivered' ? 'default' : 'secondary'} className="text-xs">
+                                {daily.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <Label>Assign Rider</Label>
-                    <div className="flex gap-2">
-                      <Select value={selectedRider} onValueChange={setSelectedRider}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Select a rider" />
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label>Subscription Duration (Days)</Label>
+                      <Select value={subscriptionDays} onValueChange={setSubscriptionDays}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select duration" />
                         </SelectTrigger>
                         <SelectContent>
-                          {riders?.map((rider: any) => (
-                            <SelectItem key={rider.id} value={rider.id}>
-                              {rider.phone} - {rider.vehicle_type}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="7">7 days (Weekly)</SelectItem>
+                          <SelectItem value="30">30 days (Monthly)</SelectItem>
+                          <SelectItem value="365">365 days (Yearly)</SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button 
-                        onClick={() => handleAssignRider(selectedOrder.id)}
-                        disabled={!selectedRider || assignRider.isPending || createDeliveryAssignment.isPending}
-                      >
-                        {(assignRider.isPending || createDeliveryAssignment.isPending) ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Assign'
-                        )}
-                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Assign Rider</Label>
+                      <div className="flex gap-2">
+                        <Select value={selectedRider} onValueChange={setSelectedRider}>
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select a rider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {riders?.map((rider: any) => (
+                              <SelectItem key={rider.id} value={rider.id}>
+                                {rider.phone} - {rider.vehicle_type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          onClick={() => handleAssignRider(selectedOrder.id)}
+                          disabled={!selectedRider || assignRider.isPending || createDeliveryAssignment.isPending}
+                        >
+                          {(assignRider.isPending || createDeliveryAssignment.isPending) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            'Assign'
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
