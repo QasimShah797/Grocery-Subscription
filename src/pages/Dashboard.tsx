@@ -106,7 +106,21 @@ export default function Dashboard() {
                     <Select 
                       value={subscription.type} 
                       onValueChange={(value: 'weekly' | 'monthly' | 'yearly') => {
-                        updateSubscription.mutate({ id: subscription.id, type: value });
+                        // Calculate next renewal date based on type
+                        const now = new Date();
+                        let nextRenewal: Date;
+                        if (value === 'weekly') {
+                          nextRenewal = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                        } else if (value === 'monthly') {
+                          nextRenewal = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                        } else {
+                          nextRenewal = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+                        }
+                        updateSubscription.mutate({ 
+                          id: subscription.id, 
+                          type: value,
+                          next_renewal_date: nextRenewal.toISOString()
+                        });
                       }}
                     >
                       <SelectTrigger className="w-28">
