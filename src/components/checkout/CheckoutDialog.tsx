@@ -6,9 +6,10 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { useCreateOrder } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
-import { Smartphone, Building2, Loader2 } from 'lucide-react';
+import { Smartphone, Building2, Loader2, MapPin } from 'lucide-react';
 
 interface CheckoutDialogProps {
   open: boolean;
@@ -63,7 +64,10 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
   const [selectedBank, setSelectedBank] = useState('hbl');
   const [senderAccount, setSenderAccount] = useState('');
   const [senderName, setSenderName] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [senderMobile, setSenderMobile] = useState('');
   const [step, setStep] = useState<'select' | 'details' | 'confirm' | 'success'>('select');
+  const [errors, setErrors] = useState<{ name?: string; account?: string; mobile?: string; address?: string }>({});
   const createOrder = useCreateOrder();
   const { toast } = useToast();
 
@@ -76,6 +80,46 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
     minimumFractionDigits: 0 
   }).format(price);
 
+  // Validation: Only alphabets and spaces allowed for name
+  const handleNameChange = (value: string) => {
+    const sanitized = value.replace(/[^a-zA-Z\s]/g, '');
+    setSenderName(sanitized);
+    if (sanitized && !/^[a-zA-Z\s]+$/.test(sanitized)) {
+      setErrors(prev => ({ ...prev, name: 'Only alphabets are allowed' }));
+    } else {
+      setErrors(prev => ({ ...prev, name: undefined }));
+    }
+  };
+
+  // Validation: Only numbers allowed for account/IBAN (bank transfer allows alphanumeric for IBAN)
+  const handleAccountChange = (value: string) => {
+    if (paymentMethod === 'bank_transfer') {
+      // IBAN can have alphanumeric
+      setSenderAccount(value.toUpperCase());
+      setErrors(prev => ({ ...prev, account: undefined }));
+    } else {
+      // Mobile wallets: only numbers and dashes
+      const sanitized = value.replace(/[^0-9-]/g, '');
+      setSenderAccount(sanitized);
+      if (value !== sanitized) {
+        setErrors(prev => ({ ...prev, account: 'Only numbers are allowed' }));
+      } else {
+        setErrors(prev => ({ ...prev, account: undefined }));
+      }
+    }
+  };
+
+  // Validation: Only numbers allowed for mobile number
+  const handleMobileChange = (value: string) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
+    setSenderMobile(sanitized);
+    if (value !== sanitized) {
+      setErrors(prev => ({ ...prev, mobile: 'Only numbers are allowed' }));
+    } else {
+      setErrors(prev => ({ ...prev, mobile: undefined }));
+    }
+  };
+
   const handleClose = () => {
     onOpenChange(false);
     // Reset form after dialog closes
@@ -83,7 +127,49 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
       setStep('select');
       setSenderAccount('');
       setSenderName('');
+      setDeliveryAddress('');
+      setSenderMobile('');
+      setErrors({});
     }, 300);
+  };
+
+  const validateDetailsStep = () => {
+    const newErrors: typeof errors = {};
+    
+    if (!senderName.trim()) {
+      newErrors.name = 'Name is required';
+    } else if (!/^[a-zA-Z\s]+$/.test(senderName)) {
+      newErrors.name = 'Only alphabets are allowed';
+    }
+
+    if (!senderAccount.trim()) {
+      newErrors.account = 'Account number is required';
+    } else if (paymentMethod !== 'bank_transfer' && !/^[0-9-]+$/.test(senderAccount)) {
+      newErrors.account = 'Only numbers are allowed';
+    }
+
+    if (!senderMobile.trim()) {
+      newErrors.mobile = 'Mobile number is required';
+    } else if (!/^[0-9]+$/.test(senderMobile)) {
+      newErrors.mobile = 'Only numbers are allowed';
+    } else if (senderMobile.length < 10 || senderMobile.length > 11) {
+      newErrors.mobile = 'Enter a valid mobile number (10-11 digits)';
+    }
+
+    if (!deliveryAddress.trim()) {
+      newErrors.address = 'Delivery address is required';
+    } else if (deliveryAddress.trim().length < 10) {
+      newErrors.address = 'Please enter a complete address';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleContinueToConfirm = () => {
+    if (validateDetailsStep()) {
+      setStep('confirm');
+    }
   };
 
   const handleSubmit = async () => {
@@ -95,6 +181,8 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
         payment_details: {
           sender_account: senderAccount,
           sender_name: senderName,
+          sender_mobile: senderMobile,
+          delivery_address: deliveryAddress,
         },
       });
       
@@ -110,7 +198,7 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
 
   return (
     <Dialog open={open} onOpenChange={step === 'success' ? handleClose : onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-display">
             {step === 'select' && 'Select Payment Method'}
@@ -197,14 +285,17 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
 
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="senderName">Your Name (as on account)</Label>
+                <Label htmlFor="senderName">Your Name (alphabets only)</Label>
                 <Input 
                   id="senderName" 
                   value={senderName} 
-                  onChange={(e) => setSenderName(e.target.value)}
-                  placeholder="Enter your name"
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="Enter your full name"
+                  className={errors.name ? 'border-destructive' : ''}
                 />
+                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="senderAccount">
                   Your {paymentMethod === 'bank_transfer' ? 'Account/IBAN' : 'Mobile'} Number
@@ -212,9 +303,40 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
                 <Input 
                   id="senderAccount" 
                   value={senderAccount} 
-                  onChange={(e) => setSenderAccount(e.target.value)}
-                  placeholder={paymentMethod === 'bank_transfer' ? 'Enter your IBAN' : 'e.g., 03XX-XXXXXXX'}
+                  onChange={(e) => handleAccountChange(e.target.value)}
+                  placeholder={paymentMethod === 'bank_transfer' ? 'Enter your IBAN' : 'e.g., 03451234567'}
+                  className={errors.account ? 'border-destructive' : ''}
                 />
+                {errors.account && <p className="text-sm text-destructive">{errors.account}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="senderMobile">Your Mobile Number (for delivery updates)</Label>
+                <Input 
+                  id="senderMobile" 
+                  value={senderMobile} 
+                  onChange={(e) => handleMobileChange(e.target.value)}
+                  placeholder="e.g., 03001234567"
+                  maxLength={11}
+                  className={errors.mobile ? 'border-destructive' : ''}
+                />
+                {errors.mobile && <p className="text-sm text-destructive">{errors.mobile}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="deliveryAddress" className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Delivery Address
+                </Label>
+                <Textarea 
+                  id="deliveryAddress" 
+                  value={deliveryAddress} 
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="Enter your complete delivery address including area, city"
+                  rows={3}
+                  className={errors.address ? 'border-destructive' : ''}
+                />
+                {errors.address && <p className="text-sm text-destructive">{errors.address}</p>}
               </div>
             </div>
 
@@ -224,8 +346,7 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
               </Button>
               <Button 
                 className="flex-1" 
-                onClick={() => setStep('confirm')}
-                disabled={!senderName || !senderAccount}
+                onClick={handleContinueToConfirm}
               >
                 Continue
               </Button>
@@ -243,7 +364,18 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
                   <p><span className="text-muted-foreground">Amount:</span> {formatPrice(amount)}</p>
                   <p><span className="text-muted-foreground">Sender Name:</span> {senderName}</p>
                   <p><span className="text-muted-foreground">Sender Account:</span> {senderAccount}</p>
+                  <p><span className="text-muted-foreground">Mobile:</span> {senderMobile}</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-muted/50">
+              <CardContent className="p-4 space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Delivery Address
+                </h3>
+                <p className="text-sm">{deliveryAddress}</p>
               </CardContent>
             </Card>
 
