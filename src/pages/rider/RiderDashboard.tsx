@@ -1,18 +1,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useRiderAssignments, useUpdateDeliveryStatus } from '@/hooks/useDeliveryAssignments';
-import { Loader2, MapPin, Phone, User, Package, CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useRiderAssignments, useRiderDailyDeliveries, useMarkDailyDelivered } from '@/hooks/useDeliveryAssignments';
+import { Loader2, MapPin, Phone, User, Package, CheckCircle, AlertCircle, Clock, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { Progress } from '@/components/ui/progress';
 
 export default function RiderDashboard() {
   const { user, isRider, loading: authLoading } = useAuth();
   const { data: assignments, isLoading } = useRiderAssignments();
-  const updateStatus = useUpdateDeliveryStatus();
+  const { data: todaysDeliveries, isLoading: todaysLoading } = useRiderDailyDeliveries();
+  const markDelivered = useMarkDailyDelivered();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -37,12 +39,12 @@ export default function RiderDashboard() {
     minimumFractionDigits: 0 
   }).format(price);
 
-  const handleStatusUpdate = async (id: string, status: string) => {
+  const handleMarkDelivered = async (dailyId: string, assignmentId: string) => {
     try {
-      await updateStatus.mutateAsync({ id, status });
-      toast({ title: 'Status updated successfully' });
+      await markDelivered.mutateAsync({ id: dailyId, assignment_id: assignmentId });
+      toast({ title: 'Marked as delivered!' });
     } catch {
-      toast({ title: 'Failed to update status', variant: 'destructive' });
+      toast({ title: 'Failed to update', variant: 'destructive' });
     }
   };
 
@@ -51,14 +53,20 @@ export default function RiderDashboard() {
       case 'delivered': return 'bg-green-100 text-green-700';
       case 'picked_up': return 'bg-blue-100 text-blue-700';
       case 'assigned': return 'bg-yellow-100 text-yellow-700';
+      case 'in_progress': return 'bg-blue-100 text-blue-700';
+      case 'completed': return 'bg-green-100 text-green-700';
       case 'pending': return 'bg-gray-100 text-gray-700';
       case 'cancelled': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const pendingDeliveries = assignments?.filter(a => a.status !== 'delivered' && a.status !== 'cancelled') || [];
-  const completedDeliveries = assignments?.filter(a => a.status === 'delivered') || [];
+  const activeAssignments = assignments?.filter(a => 
+    a.status !== 'completed' && a.status !== 'cancelled'
+  ) || [];
+  
+  const completedAssignments = assignments?.filter(a => a.status === 'completed') || [];
+  const todaysPendingCount = todaysDeliveries?.length || 0;
 
   if (authLoading || isLoading || riderLoading) {
     return (
@@ -161,52 +169,65 @@ export default function RiderDashboard() {
       <header className="bg-primary text-primary-foreground py-6 px-4">
         <div className="container mx-auto">
           <h1 className="text-2xl font-display font-bold">Rider Dashboard</h1>
-          <p className="text-primary-foreground/80">Your delivery assignments</p>
+          <p className="text-primary-foreground/80">Your daily delivery assignments</p>
         </div>
       </header>
 
       <main className="container mx-auto py-6 px-4 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4 text-center">
-              <Package className="w-8 h-8 mx-auto mb-2 text-primary" />
-              <p className="text-2xl font-bold">{pendingDeliveries.length}</p>
-              <p className="text-sm text-muted-foreground">Pending</p>
+              <Calendar className="w-6 h-6 mx-auto mb-2 text-primary" />
+              <p className="text-2xl font-bold">{todaysPendingCount}</p>
+              <p className="text-xs text-muted-foreground">Today's Pending</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-600" />
-              <p className="text-2xl font-bold">{completedDeliveries.length}</p>
-              <p className="text-sm text-muted-foreground">Completed</p>
+              <Package className="w-6 h-6 mx-auto mb-2 text-yellow-600" />
+              <p className="text-2xl font-bold">{activeAssignments.length}</p>
+              <p className="text-xs text-muted-foreground">Active Subs</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <CheckCircle className="w-6 h-6 mx-auto mb-2 text-green-600" />
+              <p className="text-2xl font-bold">{completedAssignments.length}</p>
+              <p className="text-xs text-muted-foreground">Completed</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Active Deliveries */}
+        {/* Today's Deliveries */}
         <Card>
           <CardHeader>
-            <CardTitle>Active Deliveries</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Today's Deliveries
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {pendingDeliveries.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">No active deliveries</p>
+            {todaysLoading ? (
+              <div className="text-center py-4"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>
+            ) : todaysDeliveries?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No deliveries pending for today</p>
             ) : (
-              pendingDeliveries.map((assignment) => {
-                const order = assignment.orders as any;
+              todaysDeliveries?.map((daily: any) => {
+                const assignment = daily.delivery_assignments;
+                const order = assignment?.orders;
                 const customer = order?.profiles;
                 
                 return (
-                  <Card key={assignment.id} className="border-l-4 border-l-primary">
+                  <Card key={daily.id} className="border-l-4 border-l-primary">
                     <CardContent className="p-4 space-y-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold">Order #{order?.id?.slice(0, 8)}</p>
-                          <p className="text-lg font-bold text-primary">{formatPrice(order?.amount_pkr || 0)}</p>
+                          <p className="font-semibold">Day {daily.day_number} of {assignment?.total_days}</p>
+                          <p className="text-sm text-muted-foreground">{new Date(daily.delivery_date).toLocaleDateString()}</p>
                         </div>
-                        <Badge className={getStatusColor(assignment.status || 'pending')}>
-                          {assignment.status}
+                        <Badge className={getStatusColor(daily.status)}>
+                          {daily.status}
                         </Badge>
                       </div>
 
@@ -229,22 +250,18 @@ export default function RiderDashboard() {
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t">
-                        <Select 
-                          value={assignment.status || 'assigned'}
-                          onValueChange={(value) => handleStatusUpdate(assignment.id, value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Update status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="assigned">Assigned</SelectItem>
-                            <SelectItem value="picked_up">Picked Up</SelectItem>
-                            <SelectItem value="delivered">Delivered</SelectItem>
-                            <SelectItem value="cancelled">Cancelled</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      <Button 
+                        className="w-full" 
+                        onClick={() => handleMarkDelivered(daily.id, assignment.id)}
+                        disabled={markDelivered.isPending}
+                      >
+                        {markDelivered.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        )}
+                        Mark as Delivered
+                      </Button>
                     </CardContent>
                   </Card>
                 );
@@ -253,26 +270,46 @@ export default function RiderDashboard() {
           </CardContent>
         </Card>
 
-        {/* Completed Deliveries */}
-        {completedDeliveries.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Completed Today</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {completedDeliveries.slice(0, 5).map((assignment) => {
+        {/* Active Subscriptions Progress */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Subscription Progress</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {activeAssignments.length === 0 ? (
+              <p className="text-center text-muted-foreground py-4">No active subscriptions</p>
+            ) : (
+              activeAssignments.map((assignment) => {
                 const order = assignment.orders as any;
+                const customer = order?.profiles;
+                const progress = ((assignment.delivered_days || 0) / (assignment.total_days || 7)) * 100;
+                
                 return (
-                  <div key={assignment.id} className="flex justify-between items-center py-2 border-b last:border-0">
-                    <span className="font-mono text-sm">#{order?.id?.slice(0, 8)}</span>
-                    <span className="font-semibold">{formatPrice(order?.amount_pkr || 0)}</span>
-                    <Badge variant="outline" className="text-green-600">Delivered</Badge>
+                  <div key={assignment.id} className="p-3 border rounded-lg space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{customer?.full_name || 'Customer'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order?.payment_details?.delivery_address || customer?.address || 'N/A'}
+                        </p>
+                      </div>
+                      <Badge className={getStatusColor(assignment.status || 'pending')}>
+                        {assignment.status}
+                      </Badge>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-sm">
+                        <span>Days Delivered</span>
+                        <span className="font-semibold">{assignment.delivered_days || 0} / {assignment.total_days || 7}</span>
+                      </div>
+                      <Progress value={progress} className="h-2" />
+                    </div>
                   </div>
                 );
-              })}
-            </CardContent>
-          </Card>
-        )}
+              })
+            )}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

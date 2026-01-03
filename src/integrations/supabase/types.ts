@@ -14,41 +14,91 @@ export type Database = {
   }
   public: {
     Tables: {
+      daily_deliveries: {
+        Row: {
+          created_at: string | null
+          day_number: number
+          delivered_at: string | null
+          delivery_assignment_id: string
+          delivery_date: string
+          id: string
+          notes: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_number: number
+          delivered_at?: string | null
+          delivery_assignment_id: string
+          delivery_date: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_number?: number
+          delivered_at?: string | null
+          delivery_assignment_id?: string
+          delivery_date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_deliveries_delivery_assignment_id_fkey"
+            columns: ["delivery_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_assignments: {
         Row: {
           assigned_at: string | null
           created_at: string | null
           delivered_at: string | null
+          delivered_days: number | null
           id: string
           notes: string | null
           order_id: string
           picked_up_at: string | null
           rider_id: string | null
           status: string | null
+          total_days: number | null
           updated_at: string | null
         }
         Insert: {
           assigned_at?: string | null
           created_at?: string | null
           delivered_at?: string | null
+          delivered_days?: number | null
           id?: string
           notes?: string | null
           order_id: string
           picked_up_at?: string | null
           rider_id?: string | null
           status?: string | null
+          total_days?: number | null
           updated_at?: string | null
         }
         Update: {
           assigned_at?: string | null
           created_at?: string | null
           delivered_at?: string | null
+          delivered_days?: number | null
           id?: string
           notes?: string | null
           order_id?: string
           picked_up_at?: string | null
           rider_id?: string | null
           status?: string | null
+          total_days?: number | null
           updated_at?: string | null
         }
         Relationships: [
