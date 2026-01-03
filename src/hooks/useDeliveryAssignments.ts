@@ -58,7 +58,7 @@ export function useRiderAssignments() {
         .from('delivery_assignments')
         .select(`
           *,
-          orders!inner(id, amount_pkr, payment_status, user_id)
+          orders!inner(id, amount_pkr, payment_status, payment_details, user_id)
         `)
         .eq('rider_id', rider.id)
         .order('created_at', { ascending: false });
