@@ -2,7 +2,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { ProductCard } from '@/components/products/ProductCard';
 import { useProducts } from '@/hooks/useProducts';
-import { useSubscription, useCreateSubscription, useAddToSubscription, useSubscriptionItems } from '@/hooks/useSubscription';
+import { useUserSubscriptions, useCreateSubscription, useAddToSubscription, useSubscriptionItems } from '@/hooks/useSubscription';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
@@ -10,45 +10,79 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 
 const categories = ['All', 'Dairy', 'Vegetables', 'Fruits', 'Grains', 'Meat', 'Beverages', 'Pantry', 'Bakery', 'Cooking'];
 
 export default function Products() {
   const { data: products, isLoading } = useProducts();
   const { user } = useAuth();
-  const { data: subscription } = useSubscription();
-  const { data: subscriptionItems } = useSubscriptionItems(subscription?.id);
+  const { data: subscriptions } = useUserSubscriptions();
   const createSubscription = useCreateSubscription();
   const addToSubscription = useAddToSubscription();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
+  const [selectedSubscriptionId, setSelectedSubscriptionId] = useState<string | null>(null);
+
+  // Get items from all subscriptions to check which products are already subscribed
+  const weeklySubscription = subscriptions?.find(s => s.type === 'weekly');
+  const monthlySubscription = subscriptions?.find(s => s.type === 'monthly');
+  const yearlySubscription = subscriptions?.find(s => s.type === 'yearly');
+  
+  const { data: weeklyItems } = useSubscriptionItems(weeklySubscription?.id);
+  const { data: monthlyItems } = useSubscriptionItems(monthlySubscription?.id);
+  const { data: yearlyItems } = useSubscriptionItems(yearlySubscription?.id);
+  
+  const allSubscriptionProductIds = [
+    ...(weeklyItems?.map(i => i.product_id) || []),
+    ...(monthlyItems?.map(i => i.product_id) || []),
+    ...(yearlyItems?.map(i => i.product_id) || []),
+  ];
 
   const filteredProducts = products?.filter(
     (p) => selectedCategory === 'All' || p.category === selectedCategory
   );
 
-  const subscriptionProductIds = subscriptionItems?.map((i) => i.product_id) || [];
-
-  const handleAddToSubscription = async (productId: string) => {
-    if (!subscription) {
-      // Show dialog to select subscription type
-      setPendingProductId(productId);
-      setShowSubscriptionDialog(true);
-    } else {
-      addToSubscription.mutate({ subscriptionId: subscription.id, productId });
-    }
+  const getProductSubscriptionType = (productId: string): string | null => {
+    if (weeklyItems?.some(i => i.product_id === productId)) return 'weekly';
+    if (monthlyItems?.some(i => i.product_id === productId)) return 'monthly';
+    if (yearlyItems?.some(i => i.product_id === productId)) return 'yearly';
+    return null;
   };
 
-  const handleCreateSubscription = async () => {
-    const newSub = await createSubscription.mutateAsync(selectedType);
-    if (newSub && pendingProductId) {
-      addToSubscription.mutate({ subscriptionId: newSub.id, productId: pendingProductId });
+  const handleAddToSubscription = async (productId: string) => {
+    // If product is already in any subscription, don't allow adding
+    if (allSubscriptionProductIds.includes(productId)) return;
+    
+    setPendingProductId(productId);
+    setSelectedSubscriptionId(null);
+    setShowSubscriptionDialog(true);
+  };
+
+  const handleConfirmAdd = async () => {
+    if (!pendingProductId) return;
+    
+    if (selectedSubscriptionId) {
+      // Add to existing subscription
+      addToSubscription.mutate({ subscriptionId: selectedSubscriptionId, productId: pendingProductId });
+    } else {
+      // Create new subscription
+      const newSub = await createSubscription.mutateAsync(selectedType);
+      if (newSub) {
+        addToSubscription.mutate({ subscriptionId: newSub.id, productId: pendingProductId });
+      }
     }
     setShowSubscriptionDialog(false);
     setPendingProductId(null);
+    setSelectedSubscriptionId(null);
   };
+
+  const existingSubscriptions = subscriptions?.filter(s => s.status === 'active' || s.status === 'paused') || [];
+  const availableNewTypes = (['weekly', 'monthly', 'yearly'] as const).filter(
+    type => !existingSubscriptions.some(s => s.type === type)
+  );
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -81,55 +115,109 @@ export default function Products() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {filteredProducts?.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToSubscription={handleAddToSubscription}
-                  isInSubscription={subscriptionProductIds.includes(product.id)}
-                />
-              ))}
+              {filteredProducts?.map((product) => {
+                const subscriptionType = getProductSubscriptionType(product.id);
+                return (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAddToSubscription={handleAddToSubscription}
+                    isInSubscription={!!subscriptionType}
+                    subscriptionType={subscriptionType}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
       </main>
       <Footer />
 
-      {/* Subscription Type Selection Dialog */}
+      {/* Subscription Selection Dialog */}
       <Dialog open={showSubscriptionDialog} onOpenChange={setShowSubscriptionDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Choose Subscription Type</DialogTitle>
+            <DialogTitle>Choose Subscription</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Select how often you'd like to receive your groceries. Product prices will be multiplied by the number of days in your subscription period.
+              Add this product to an existing subscription or create a new one.
             </p>
-            <RadioGroup value={selectedType} onValueChange={(v) => setSelectedType(v as typeof selectedType)}>
-              <div className="flex items-center space-x-3 p-3 border rounded-lg">
-                <RadioGroupItem value="weekly" id="weekly" />
-                <Label htmlFor="weekly" className="flex-1 cursor-pointer">
-                  <span className="font-semibold">Weekly</span>
-                  <span className="text-sm text-muted-foreground block">Price × 7 days</span>
-                </Label>
+            
+            {/* Existing Subscriptions */}
+            {existingSubscriptions.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Add to Existing Subscription</Label>
+                <RadioGroup 
+                  value={selectedSubscriptionId || ''} 
+                  onValueChange={(v) => {
+                    setSelectedSubscriptionId(v);
+                    setSelectedType('weekly'); // Reset new type selection
+                  }}
+                >
+                  {existingSubscriptions.map((sub) => (
+                    <div key={sub.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50">
+                      <RadioGroupItem value={sub.id} id={sub.id} />
+                      <Label htmlFor={sub.id} className="flex-1 cursor-pointer flex items-center justify-between">
+                        <span className="font-semibold capitalize">{sub.type} Subscription</span>
+                        <Badge variant={sub.status === 'active' ? 'success' : 'secondary'}>{sub.status}</Badge>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
               </div>
-              <div className="flex items-center space-x-3 p-3 border rounded-lg">
-                <RadioGroupItem value="monthly" id="monthly" />
-                <Label htmlFor="monthly" className="flex-1 cursor-pointer">
-                  <span className="font-semibold">Monthly</span>
-                  <span className="text-sm text-muted-foreground block">Price × 30 days</span>
+            )}
+            
+            {/* Create New Subscription */}
+            {availableNewTypes.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  {existingSubscriptions.length > 0 ? 'Or Create New Subscription' : 'Create Subscription'}
                 </Label>
+                <RadioGroup 
+                  value={selectedSubscriptionId ? '' : selectedType} 
+                  onValueChange={(v) => {
+                    setSelectedSubscriptionId(null);
+                    setSelectedType(v as typeof selectedType);
+                  }}
+                >
+                  {availableNewTypes.includes('weekly') && (
+                    <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50">
+                      <RadioGroupItem value="weekly" id="new-weekly" />
+                      <Label htmlFor="new-weekly" className="flex-1 cursor-pointer">
+                        <span className="font-semibold">Weekly</span>
+                        <span className="text-sm text-muted-foreground block">Price × 7 days</span>
+                      </Label>
+                    </div>
+                  )}
+                  {availableNewTypes.includes('monthly') && (
+                    <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50">
+                      <RadioGroupItem value="monthly" id="new-monthly" />
+                      <Label htmlFor="new-monthly" className="flex-1 cursor-pointer">
+                        <span className="font-semibold">Monthly</span>
+                        <span className="text-sm text-muted-foreground block">Price × 30 days</span>
+                      </Label>
+                    </div>
+                  )}
+                  {availableNewTypes.includes('yearly') && (
+                    <div className="flex items-center space-x-3 p-3 border rounded-lg border-green-200 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30">
+                      <RadioGroupItem value="yearly" id="new-yearly" />
+                      <Label htmlFor="new-yearly" className="flex-1 cursor-pointer">
+                        <span className="font-semibold">Yearly <span className="text-green-600 text-xs ml-1">10% OFF</span></span>
+                        <span className="text-sm text-muted-foreground block">Price × 365 days - Best value!</span>
+                      </Label>
+                    </div>
+                  )}
+                </RadioGroup>
               </div>
-              <div className="flex items-center space-x-3 p-3 border rounded-lg border-green-200 bg-green-50 dark:bg-green-900/20">
-                <RadioGroupItem value="yearly" id="yearly" />
-                <Label htmlFor="yearly" className="flex-1 cursor-pointer">
-                  <span className="font-semibold">Yearly <span className="text-green-600 text-xs ml-1">10% OFF</span></span>
-                  <span className="text-sm text-muted-foreground block">Price × 365 days - Best value!</span>
-                </Label>
-              </div>
-            </RadioGroup>
-            <Button className="w-full" onClick={handleCreateSubscription} disabled={createSubscription.isPending}>
-              {createSubscription.isPending ? 'Creating...' : 'Start Subscription'}
+            )}
+            
+            <Button 
+              className="w-full" 
+              onClick={handleConfirmAdd} 
+              disabled={createSubscription.isPending || addToSubscription.isPending}
+            >
+              {createSubscription.isPending || addToSubscription.isPending ? 'Adding...' : 'Add to Subscription'}
             </Button>
           </div>
         </DialogContent>

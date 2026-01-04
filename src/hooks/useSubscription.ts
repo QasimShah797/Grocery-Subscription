@@ -33,26 +33,37 @@ export interface SubscriptionItem {
   };
 }
 
-export function useSubscription() {
+// Fetch all user subscriptions (not just single active one)
+export function useUserSubscriptions() {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['subscription', user?.id],
+    queryKey: ['subscriptions', user?.id],
     queryFn: async () => {
-      if (!user) return null;
+      if (!user) return [];
       
       const { data, error } = await supabase
         .from('subscriptions')
         .select('*')
         .eq('user_id', user.id)
-        .eq('status', 'active')
-        .single();
+        .in('status', ['active', 'paused'])
+        .order('created_at', { ascending: false });
       
-      if (error && error.code !== 'PGRST116') throw error;
-      return data as Subscription | null;
+      if (error) throw error;
+      return data as Subscription[];
     },
     enabled: !!user,
   });
+}
+
+// Legacy hook for backward compatibility - returns first active subscription
+export function useSubscription() {
+  const { data: subscriptions } = useUserSubscriptions();
+  
+  return {
+    data: subscriptions?.find(s => s.status === 'active') || subscriptions?.[0] || null,
+    isLoading: false,
+  };
 }
 
 export function useSubscriptionItems(subscriptionId: string | undefined) {
@@ -110,7 +121,7 @@ export function useCreateSubscription() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       toast.success('Subscription created!');
     },
     onError: (error: Error) => {
@@ -155,7 +166,7 @@ export function useAddToSubscription() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscription-items'] });
-      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       toast.success('Added to subscription!');
     },
     onError: (error: Error) => {
@@ -230,7 +241,7 @@ export function useUpdateSubscription() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       toast.success('Subscription updated');
     },
     onError: (error: Error) => {

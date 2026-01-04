@@ -10,9 +10,10 @@ interface ProductCardProps {
   product: Product;
   onAddToSubscription?: (productId: string) => void;
   isInSubscription?: boolean;
+  subscriptionType?: string | null;
 }
 
-export function ProductCard({ product, onAddToSubscription, isInSubscription }: ProductCardProps) {
+export function ProductCard({ product, onAddToSubscription, isInSubscription, subscriptionType }: ProductCardProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -52,12 +53,12 @@ export function ProductCard({ product, onAddToSubscription, isInSubscription }: 
         >
           {product.category}
         </Badge>
-        {isInSubscription && (
+        {isInSubscription && subscriptionType && (
           <Badge 
             variant="success" 
-            className="absolute top-3 right-3"
+            className="absolute top-3 right-3 capitalize"
           >
-            In Subscription
+            {subscriptionType}
           </Badge>
         )}
       </div>
