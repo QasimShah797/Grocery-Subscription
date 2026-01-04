@@ -25,7 +25,7 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [transactionId, setTransactionId] = useState('');
   const [selectedRider, setSelectedRider] = useState('');
-  const [subscriptionDays, setSubscriptionDays] = useState('7');
+  
 
   // Get current assignment for selected order
   const currentAssignment = deliveryAssignments?.find((a: any) => a.order_id === selectedOrder?.id);
@@ -48,13 +48,22 @@ export default function AdminOrders() {
     }
   };
 
-  const handleAssignRider = async (orderId: string) => {
+  const getSubscriptionDays = (subscriptionType: string | null | undefined): number => {
+    switch (subscriptionType) {
+      case 'weekly': return 7;
+      case 'monthly': return 30;
+      case 'yearly': return 365;
+      default: return 7;
+    }
+  };
+
+  const handleAssignRider = async (orderId: string, subscriptionType: string | null | undefined) => {
     if (!selectedRider) {
       toast({ title: 'Please select a rider', variant: 'destructive' });
       return;
     }
     
-    const totalDays = parseInt(subscriptionDays) || 7;
+    const totalDays = getSubscriptionDays(subscriptionType);
     
     try {
       // Check if delivery assignment exists for this order
@@ -68,7 +77,6 @@ export default function AdminOrders() {
       
       toast({ title: 'Rider assigned successfully' });
       setSelectedRider('');
-      setSubscriptionDays('7');
       setSelectedOrder(null);
     } catch {
       toast({ title: 'Failed to assign rider', variant: 'destructive' });
@@ -293,19 +301,13 @@ export default function AdminOrders() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label>Subscription Duration (Days)</Label>
-                      <Select value={subscriptionDays} onValueChange={setSubscriptionDays}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select duration" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="7">7 days (Weekly)</SelectItem>
-                          <SelectItem value="30">30 days (Monthly)</SelectItem>
-                          <SelectItem value="365">365 days (Yearly)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {selectedOrder.subscriptions?.type && (
+                      <div className="p-2 bg-muted rounded text-sm">
+                        <span className="text-muted-foreground">Subscription:</span>{' '}
+                        <span className="font-medium capitalize">{selectedOrder.subscriptions.type}</span>{' '}
+                        <span className="text-muted-foreground">({getSubscriptionDays(selectedOrder.subscriptions?.type)} days)</span>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <Label>Assign Rider</Label>
                       <div className="flex gap-2">
@@ -322,7 +324,7 @@ export default function AdminOrders() {
                           </SelectContent>
                         </Select>
                         <Button 
-                          onClick={() => handleAssignRider(selectedOrder.id)}
+                          onClick={() => handleAssignRider(selectedOrder.id, selectedOrder.subscriptions?.type)}
                           disabled={!selectedRider || assignRider.isPending || createDeliveryAssignment.isPending}
                         >
                           {(assignRider.isPending || createDeliveryAssignment.isPending) ? (
