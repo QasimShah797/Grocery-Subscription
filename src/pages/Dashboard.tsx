@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -30,9 +30,11 @@ function SubscriptionPanel({ subscription, onEmpty }: { subscription: Subscripti
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   // Notify parent when subscription has no items (after loading completes)
-  if (!itemsLoading && items && items.length === 0) {
-    onEmpty(subscription.id);
-  }
+  useEffect(() => {
+    if (!itemsLoading && items && items.length === 0) {
+      onEmpty(subscription.id);
+    }
+  }, [itemsLoading, items, onEmpty, subscription.id]);
 
   // Check if there's already an order for this subscription in the current billing cycle
   const existingOrder = orders?.find(order => 
