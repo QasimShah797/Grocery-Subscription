@@ -2,7 +2,7 @@ import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
 import { ProductCard } from '@/components/products/ProductCard';
 import { useProducts } from '@/hooks/useProducts';
-import { useUserSubscriptions, useCreateSubscription, useAddToSubscription, useSubscriptionItems } from '@/hooks/useSubscription';
+import { useUserSubscriptions, useCreateSubscription, useAddToSubscription, useSubscriptionItems, useDeleteSubscription } from '@/hooks/useSubscription';
 import { useOrders } from '@/hooks/useOrders';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +21,7 @@ export default function Products() {
   const { data: subscriptions } = useUserSubscriptions();
   const createSubscription = useCreateSubscription();
   const addToSubscription = useAddToSubscription();
+  const deleteSubscription = useDeleteSubscription();
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showSubscriptionDialog, setShowSubscriptionDialog] = useState(false);
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
@@ -35,6 +36,33 @@ export default function Products() {
   const { data: weeklyItems } = useSubscriptionItems(weeklySubscription?.id);
   const { data: monthlyItems } = useSubscriptionItems(monthlySubscription?.id);
   const { data: yearlyItems } = useSubscriptionItems(yearlySubscription?.id);
+
+  // Track item counts for each subscription
+  const subscriptionItemCounts = new Map<string, number>();
+  if (weeklySubscription) subscriptionItemCounts.set(weeklySubscription.id, weeklyItems?.length || 0);
+  if (monthlySubscription) subscriptionItemCounts.set(monthlySubscription.id, monthlyItems?.length || 0);
+  if (yearlySubscription) subscriptionItemCounts.set(yearlySubscription.id, yearlyItems?.length || 0);
+
+  // Find empty subscriptions (no items) that are not paid
+  const { data: orders } = useOrders();
+  const emptySubscriptionsToDelete = subscriptions?.filter(s => {
+    const itemCount = subscriptionItemCounts.get(s.id);
+    if (itemCount !== 0) return false;
+    
+    // Only delete if not paid
+    const hasPaidOrder = orders?.some(order => 
+      order.subscription_id === s.id && 
+      (order.payment_status === 'completed' || order.payment_status === 'processing')
+    );
+    return !hasPaidOrder;
+  }) || [];
+
+  // Auto-cleanup empty subscriptions when detected (only once per render)
+  if (emptySubscriptionsToDelete.length > 0 && !deleteSubscription.isPending) {
+    emptySubscriptionsToDelete.forEach(s => {
+      deleteSubscription.mutate(s.id);
+    });
+  }
   
   const allSubscriptionProductIds = [
     ...(weeklyItems?.map(i => i.product_id) || []),
@@ -80,7 +108,6 @@ export default function Products() {
     setSelectedSubscriptionId(null);
   };
 
-  const { data: orders } = useOrders();
 
   // Separate subscriptions into unpaid and paid (in-progress)
   const existingSubscriptions = subscriptions?.filter(s => s.status === 'active' || s.status === 'paused') || [];
