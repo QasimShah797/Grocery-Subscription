@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateOrder } from '@/hooks/useOrders';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/integrations/supabase/client';
 import { Smartphone, Building2, Loader2, MapPin } from 'lucide-react';
 
 interface CheckoutDialogProps {
@@ -70,9 +72,30 @@ export function CheckoutDialog({ open, onOpenChange, subscriptionId, amount }: C
   const [errors, setErrors] = useState<{ name?: string; account?: string; mobile?: string; address?: string }>({});
   const createOrder = useCreateOrder();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const selectedMethod = paymentMethods.find(m => m.id === paymentMethod)!;
   const selectedBankInfo = bankOptions.find(b => b.id === selectedBank);
+
+  // Auto-fill from user profile
+  useEffect(() => {
+    if (user && open) {
+      const fetchProfile = async () => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name, phone, address')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          if (profile.full_name) setSenderName(profile.full_name);
+          if (profile.phone) setSenderMobile(profile.phone);
+          if (profile.address) setDeliveryAddress(profile.address);
+        }
+      };
+      fetchProfile();
+    }
+  }, [user, open]);
 
   const formatPrice = (price: number) => new Intl.NumberFormat('en-PK', { 
     style: 'currency', 
