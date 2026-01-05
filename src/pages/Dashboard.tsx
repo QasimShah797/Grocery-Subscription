@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth-context';
-import { useUserSubscriptions, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription, useDeleteSubscription, Subscription } from '@/hooks/useSubscription';
+import { useUserSubscriptions, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription, Subscription } from '@/hooks/useSubscription';
 import { useOrders } from '@/hooks/useOrders';
 import { CheckoutDialog } from '@/components/checkout/CheckoutDialog';
 import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard, Package, CheckCircle } from 'lucide-react';
@@ -21,33 +21,13 @@ const SUBSCRIPTION_MULTIPLIERS = {
 
 const YEARLY_DISCOUNT = 0.10;
 
-function SubscriptionPanel({ subscription, onEmpty }: { subscription: Subscription; onEmpty: (id: string) => void }) {
-  const { data: items, isLoading: itemsLoading } = useSubscriptionItems(subscription.id);
+function SubscriptionPanel({ subscription }: { subscription: Subscription }) {
+  const { data: items } = useSubscriptionItems(subscription.id);
   const { data: orders } = useOrders();
   const updateItem = useUpdateSubscriptionItem();
   const removeItem = useRemoveFromSubscription();
   const updateSubscription = useUpdateSubscription();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-
-  // Notify parent when subscription has no items (after loading completes)
-  // Only trigger if subscription is older than 30 seconds (to allow product addition) and has no active orders
-  useEffect(() => {
-    if (!itemsLoading && items && items.length === 0) {
-      const createdAt = new Date(subscription.created_at);
-      const now = new Date();
-      const ageInSeconds = (now.getTime() - createdAt.getTime()) / 1000;
-      
-      // Only delete if subscription is older than 30 seconds and has no active orders
-      const hasActiveOrder = orders?.some(order => 
-        order.subscription_id === subscription.id && 
-        (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
-      );
-      
-      if (ageInSeconds > 30 && !hasActiveOrder) {
-        onEmpty(subscription.id);
-      }
-    }
-  }, [itemsLoading, items, orders, onEmpty, subscription.id, subscription.created_at]);
 
   // Check if there's already an order for this subscription in the current billing cycle
   const existingOrder = orders?.find(order => 
@@ -181,24 +161,14 @@ function SubscriptionPanel({ subscription, onEmpty }: { subscription: Subscripti
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const { data: subscriptions } = useUserSubscriptions();
-  const deleteSubscription = useDeleteSubscription();
   const [activeTab, setActiveTab] = useState<string>('');
-  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
   const activeSubscriptions = subscriptions?.filter(s => 
-    (s.status === 'active' || s.status === 'paused') && !deletingIds.has(s.id)
+    (s.status === 'active' || s.status === 'paused')
   ) || [];
-
-  // Handle empty subscription deletion
-  const handleEmptySubscription = (id: string) => {
-    if (!deletingIds.has(id) && !deleteSubscription.isPending) {
-      setDeletingIds(prev => new Set(prev).add(id));
-      deleteSubscription.mutate(id);
-    }
-  };
   
   // Set default tab to first subscription
   if (activeSubscriptions.length > 0 && !activeTab) {
@@ -225,7 +195,7 @@ export default function Dashboard() {
               
               {activeSubscriptions.map((sub) => (
                 <TabsContent key={sub.id} value={sub.id}>
-                  <SubscriptionPanel subscription={sub} onEmpty={handleEmptySubscription} />
+                  <SubscriptionPanel subscription={sub} />
                 </TabsContent>
               ))}
             </Tabs>
