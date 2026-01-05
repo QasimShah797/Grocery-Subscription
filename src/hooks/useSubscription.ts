@@ -228,6 +228,34 @@ export function useRemoveFromSubscription() {
   });
 }
 
+export function useDeleteSubscription() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (subscriptionId: string) => {
+      // First delete all subscription items
+      await supabase
+        .from('subscription_items')
+        .delete()
+        .eq('subscription_id', subscriptionId);
+      
+      // Then delete the subscription
+      const { error } = await supabase
+        .from('subscriptions')
+        .delete()
+        .eq('id', subscriptionId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
 export function useUpdateSubscription() {
   const queryClient = useQueryClient();
   
