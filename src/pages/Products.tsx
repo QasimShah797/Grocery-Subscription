@@ -3,6 +3,7 @@ import { Footer } from '@/components/layout/Footer';
 import { ProductCard } from '@/components/products/ProductCard';
 import { useProducts } from '@/hooks/useProducts';
 import { useUserSubscriptions, useCreateSubscription, useAddToSubscription, useSubscriptionItems } from '@/hooks/useSubscription';
+import { useOrders } from '@/hooks/useOrders';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
@@ -79,10 +80,21 @@ export default function Products() {
     setSelectedSubscriptionId(null);
   };
 
-  const existingSubscriptions = subscriptions?.filter(s => s.status === 'active' || s.status === 'paused') || [];
-  const availableNewTypes = (['weekly', 'monthly', 'yearly'] as const).filter(
-    type => !existingSubscriptions.some(s => s.type === type)
-  );
+  const { data: orders } = useOrders();
+
+  // Filter subscriptions that don't have an active order (unpaid subscriptions only)
+  const unpaidSubscriptions = subscriptions?.filter(s => {
+    if (s.status !== 'active' && s.status !== 'paused') return false;
+    // Check if this subscription has an active order
+    const hasActiveOrder = orders?.some(order => 
+      order.subscription_id === s.id && 
+      (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
+    );
+    return !hasActiveOrder; // Only show subscriptions without active orders
+  }) || [];
+
+  // For new subscriptions, allow any type (not limited by existing subscriptions anymore)
+  const availableNewTypes: ('weekly' | 'monthly' | 'yearly')[] = ['weekly', 'monthly', 'yearly'];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -144,10 +156,10 @@ export default function Products() {
               Add this product to an existing subscription or create a new one.
             </p>
             
-            {/* Existing Subscriptions */}
-            {existingSubscriptions.length > 0 && (
+            {/* Existing Unpaid Subscriptions */}
+            {unpaidSubscriptions.length > 0 && (
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Add to Existing Subscription</Label>
+                <Label className="text-sm font-medium">Add to Unpaid Subscription</Label>
                 <RadioGroup 
                   value={selectedSubscriptionId || ''} 
                   onValueChange={(v) => {
@@ -155,12 +167,12 @@ export default function Products() {
                     setSelectedType('weekly'); // Reset new type selection
                   }}
                 >
-                  {existingSubscriptions.map((sub) => (
+                  {unpaidSubscriptions.map((sub) => (
                     <div key={sub.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-muted/50">
                       <RadioGroupItem value={sub.id} id={sub.id} />
                       <Label htmlFor={sub.id} className="flex-1 cursor-pointer flex items-center justify-between">
                         <span className="font-semibold capitalize">{sub.type} Subscription</span>
-                        <Badge variant={sub.status === 'active' ? 'success' : 'secondary'}>{sub.status}</Badge>
+                        <Badge variant="outline">Unpaid</Badge>
                       </Label>
                     </div>
                   ))}
@@ -169,11 +181,10 @@ export default function Products() {
             )}
             
             {/* Create New Subscription */}
-            {availableNewTypes.length > 0 && (
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">
-                  {existingSubscriptions.length > 0 ? 'Or Create New Subscription' : 'Create Subscription'}
-                </Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                {unpaidSubscriptions.length > 0 ? 'Or Create New Subscription' : 'Create New Subscription'}
+              </Label>
                 <RadioGroup 
                   value={selectedSubscriptionId ? '' : selectedType} 
                   onValueChange={(v) => {
@@ -210,7 +221,6 @@ export default function Products() {
                   )}
                 </RadioGroup>
               </div>
-            )}
             
             <Button 
               className="w-full" 
