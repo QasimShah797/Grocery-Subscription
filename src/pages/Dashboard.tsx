@@ -30,11 +30,24 @@ function SubscriptionPanel({ subscription, onEmpty }: { subscription: Subscripti
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   // Notify parent when subscription has no items (after loading completes)
+  // Only trigger if subscription is older than 30 seconds (to allow product addition) and has no active orders
   useEffect(() => {
     if (!itemsLoading && items && items.length === 0) {
-      onEmpty(subscription.id);
+      const createdAt = new Date(subscription.created_at);
+      const now = new Date();
+      const ageInSeconds = (now.getTime() - createdAt.getTime()) / 1000;
+      
+      // Only delete if subscription is older than 30 seconds and has no active orders
+      const hasActiveOrder = orders?.some(order => 
+        order.subscription_id === subscription.id && 
+        (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
+      );
+      
+      if (ageInSeconds > 30 && !hasActiveOrder) {
+        onEmpty(subscription.id);
+      }
     }
-  }, [itemsLoading, items, onEmpty, subscription.id]);
+  }, [itemsLoading, items, orders, onEmpty, subscription.id, subscription.created_at]);
 
   // Check if there's already an order for this subscription in the current billing cycle
   const existingOrder = orders?.find(order => 
