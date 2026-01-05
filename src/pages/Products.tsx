@@ -82,18 +82,26 @@ export default function Products() {
 
   const { data: orders } = useOrders();
 
-  // Filter subscriptions that don't have an active order (unpaid subscriptions only)
-  const unpaidSubscriptions = subscriptions?.filter(s => {
-    if (s.status !== 'active' && s.status !== 'paused') return false;
-    // Check if this subscription has an active order
+  // Separate subscriptions into unpaid and paid (in-progress)
+  const existingSubscriptions = subscriptions?.filter(s => s.status === 'active' || s.status === 'paused') || [];
+  
+  const unpaidSubscriptions = existingSubscriptions.filter(s => {
     const hasActiveOrder = orders?.some(order => 
       order.subscription_id === s.id && 
       (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
     );
-    return !hasActiveOrder; // Only show subscriptions without active orders
-  }) || [];
+    return !hasActiveOrder;
+  });
 
-  // For new subscriptions, allow any type (not limited by existing subscriptions anymore)
+  const paidSubscriptions = existingSubscriptions.filter(s => {
+    const hasActiveOrder = orders?.some(order => 
+      order.subscription_id === s.id && 
+      (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
+    );
+    return hasActiveOrder;
+  });
+
+  // For new subscriptions, allow any type
   const availableNewTypes: ('weekly' | 'monthly' | 'yearly')[] = ['weekly', 'monthly', 'yearly'];
 
   return (
@@ -156,6 +164,34 @@ export default function Products() {
               Add this product to an existing subscription or create a new one.
             </p>
             
+            {/* Paid Subscriptions (In Progress) */}
+            {paidSubscriptions.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Add for Next Billing Cycle</Label>
+                <p className="text-xs text-muted-foreground">These subscriptions are already paid. New items will be charged on renewal.</p>
+                <RadioGroup 
+                  value={selectedSubscriptionId || ''} 
+                  onValueChange={(v) => {
+                    setSelectedSubscriptionId(v);
+                    setSelectedType('weekly');
+                  }}
+                >
+                  {paidSubscriptions.map((sub) => (
+                    <div key={sub.id} className="flex items-center space-x-3 p-3 border rounded-lg border-blue-200 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30">
+                      <RadioGroupItem value={sub.id} id={sub.id} />
+                      <Label htmlFor={sub.id} className="flex-1 cursor-pointer flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold capitalize">{sub.type} Subscription</span>
+                          <span className="text-xs text-blue-600 block">Charged on next renewal</span>
+                        </div>
+                        <Badge variant="secondary">In Progress</Badge>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
+
             {/* Existing Unpaid Subscriptions */}
             {unpaidSubscriptions.length > 0 && (
               <div className="space-y-2">
@@ -164,7 +200,7 @@ export default function Products() {
                   value={selectedSubscriptionId || ''} 
                   onValueChange={(v) => {
                     setSelectedSubscriptionId(v);
-                    setSelectedType('weekly'); // Reset new type selection
+                    setSelectedType('weekly');
                   }}
                 >
                   {unpaidSubscriptions.map((sub) => (
