@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth-context';
-import { useUserSubscriptions, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription, Subscription } from '@/hooks/useSubscription';
+import { useUserSubscriptions, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription, useDeleteSubscription, Subscription } from '@/hooks/useSubscription';
 import { useOrders } from '@/hooks/useOrders';
 import { CheckoutDialog } from '@/components/checkout/CheckoutDialog';
 import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard, Package, CheckCircle } from 'lucide-react';
@@ -21,13 +21,18 @@ const SUBSCRIPTION_MULTIPLIERS = {
 
 const YEARLY_DISCOUNT = 0.10;
 
-function SubscriptionPanel({ subscription }: { subscription: Subscription }) {
-  const { data: items } = useSubscriptionItems(subscription.id);
+function SubscriptionPanel({ subscription, onEmpty }: { subscription: Subscription; onEmpty: (id: string) => void }) {
+  const { data: items, isLoading: itemsLoading } = useSubscriptionItems(subscription.id);
   const { data: orders } = useOrders();
   const updateItem = useUpdateSubscriptionItem();
   const removeItem = useRemoveFromSubscription();
   const updateSubscription = useUpdateSubscription();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // Notify parent when subscription has no items (after loading completes)
+  if (!itemsLoading && items && items.length === 0) {
+    onEmpty(subscription.id);
+  }
 
   // Check if there's already an order for this subscription in the current billing cycle
   const existingOrder = orders?.find(order => 
@@ -161,12 +166,24 @@ function SubscriptionPanel({ subscription }: { subscription: Subscription }) {
 export default function Dashboard() {
   const { user, loading } = useAuth();
   const { data: subscriptions } = useUserSubscriptions();
+  const deleteSubscription = useDeleteSubscription();
   const [activeTab, setActiveTab] = useState<string>('');
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   if (loading) return null;
   if (!user) return <Navigate to="/auth" replace />;
 
-  const activeSubscriptions = subscriptions?.filter(s => s.status === 'active' || s.status === 'paused') || [];
+  const activeSubscriptions = subscriptions?.filter(s => 
+    (s.status === 'active' || s.status === 'paused') && !deletingIds.has(s.id)
+  ) || [];
+
+  // Handle empty subscription deletion
+  const handleEmptySubscription = (id: string) => {
+    if (!deletingIds.has(id) && !deleteSubscription.isPending) {
+      setDeletingIds(prev => new Set(prev).add(id));
+      deleteSubscription.mutate(id);
+    }
+  };
   
   // Set default tab to first subscription
   if (activeSubscriptions.length > 0 && !activeTab) {
@@ -193,7 +210,7 @@ export default function Dashboard() {
               
               {activeSubscriptions.map((sub) => (
                 <TabsContent key={sub.id} value={sub.id}>
-                  <SubscriptionPanel subscription={sub} />
+                  <SubscriptionPanel subscription={sub} onEmpty={handleEmptySubscription} />
                 </TabsContent>
               ))}
             </Tabs>
