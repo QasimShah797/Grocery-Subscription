@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/auth-context';
 import { useUserSubscriptions, useSubscriptionItems, useUpdateSubscriptionItem, useRemoveFromSubscription, useUpdateSubscription, Subscription } from '@/hooks/useSubscription';
+import { useOrders } from '@/hooks/useOrders';
 import { CheckoutDialog } from '@/components/checkout/CheckoutDialog';
-import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard, Package } from 'lucide-react';
+import { Minus, Plus, Trash2, Calendar, Pause, Play, CreditCard, Package, CheckCircle } from 'lucide-react';
 
 // Multipliers for subscription types
 const SUBSCRIPTION_MULTIPLIERS = {
@@ -22,10 +23,18 @@ const YEARLY_DISCOUNT = 0.10;
 
 function SubscriptionPanel({ subscription }: { subscription: Subscription }) {
   const { data: items } = useSubscriptionItems(subscription.id);
+  const { data: orders } = useOrders();
   const updateItem = useUpdateSubscriptionItem();
   const removeItem = useRemoveFromSubscription();
   const updateSubscription = useUpdateSubscription();
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+
+  // Check if there's already an order for this subscription in the current billing cycle
+  const existingOrder = orders?.find(order => 
+    order.subscription_id === subscription.id && 
+    (order.payment_status === 'pending' || order.payment_status === 'processing' || order.payment_status === 'completed')
+  );
+  const hasActiveOrder = !!existingOrder;
 
   const baseTotal = items?.reduce((sum, item) => sum + (item.product?.price_pkr || 0) * item.quantity, 0) || 0;
   const multiplier = SUBSCRIPTION_MULTIPLIERS[subscription.type as keyof typeof SUBSCRIPTION_MULTIPLIERS] || 1;
@@ -118,9 +127,21 @@ function SubscriptionPanel({ subscription }: { subscription: Subscription }) {
             <span>Total</span>
             <span className="text-primary">{formatPrice(total)}</span>
           </div>
-          <Button className="w-full" onClick={() => setCheckoutOpen(true)} disabled={!items || items.length === 0}>
-            <CreditCard className="w-4 h-4 mr-2" /> Checkout
-          </Button>
+          {hasActiveOrder ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded">
+                <CheckCircle className="w-4 h-4" />
+                <span>Order {existingOrder.payment_status === 'completed' ? 'completed' : 'in progress'}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                New products will be included in your next billing cycle.
+              </p>
+            </div>
+          ) : (
+            <Button className="w-full" onClick={() => setCheckoutOpen(true)} disabled={!items || items.length === 0}>
+              <CreditCard className="w-4 h-4 mr-2" /> Checkout
+            </Button>
+          )}
           <Button variant="outline" className="w-full" onClick={toggleStatus}>
             {subscription.status === 'active' ? <><Pause className="w-4 h-4 mr-2" /> Pause</> : <><Play className="w-4 h-4 mr-2" /> Resume</>}
           </Button>
